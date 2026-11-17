@@ -77,7 +77,7 @@
   const $ = id => document.getElementById(id);
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
   let products = [], stream = null, worker = null, scanTimer = null, busy = false;
-  let lastCandidate = "", repeatCount = 0, lastScanAt = 0;
+  let lastCandidate = "", repeatCount = 0;
 
   function setStatus(s) { $("status").textContent = s; }
   function jsonp(url) {
@@ -109,15 +109,49 @@
   function normalize(s) {
     return String(s || "").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
   }
-  function tokens(s) { return normalize(s).split(" ").filter(x => x.length > 1); }
+  const STOP_WORDS = new Set(["the","and","with","for","from","new","pack","each","use","ml","gm"]);
+  function tokens(s) {
+    return normalize(s).split(" ").filter(x => x.length > 1 && !STOP_WORDS.has(x));
+  }
+  // Compare complete words. A small edit-distance allowance corrects common OCR
+  // confusions such as SPIRUL1NA -> SPIRULINA without matching isolated letters.
+  function wordSimilarity(a, b) {
+    if (a === b) return 1;
+    if (Math.abs(a.length - b.length) > 2) return 0;
+    if (Math.min(a.length, b.length) < 4) return 0;
+    const prev = Array.from({length:b.length + 1}, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      let diagonal = prev[0]; prev[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const above = prev[j];
+        prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+        diagonal = above;
+      }
+    }
+    const distance = prev[b.length];
+    const allowed = Math.max(a.length, b.length) >= 9 ? 2 : 1;
+    return distance <= allowed ? 1 - distance / Math.max(a.length, b.length) : 0;
+  }
   function similarity(ocr, name) {
-    const a = new Set(tokens(ocr)), b = new Set(tokens(name));
-    if (!a.size || !b.size) return 0;
-    let hit = 0;
-    for (const t of b) if (a.has(t)) hit++;
-    const coverage = hit / b.size;
-    const precision = hit / Math.max(1, a.size);
-    return (coverage * .78) + (precision * .22);
+    const heard = [...new Set(tokens(ocr))];
+    const wanted = [...new Set(tokens(name))];
+    if (!heard.length || !wanted.length) return {score:0, matched:0, words:[]};
+    let totalWeight = 0, matchedWeight = 0, matched = 0;
+    const matchedWords = [];
+    for (const word of wanted) {
+      // Longer, distinctive product words contribute more than generic short words.
+      const weight = Math.min(2.2, 0.7 + word.length / 5);
+      totalWeight += weight;
+      let best = 0;
+      for (const seen of heard) best = Math.max(best, wordSimilarity(word, seen));
+      if (best >= 0.78) {
+        matched++;
+        matchedWeight += weight * best;
+        matchedWords.push(word);
+      }
+    }
+    const coverage = matchedWeight / totalWeight;
+    return {score:coverage, matched, words:matchedWords};
   }
   function formatMoney(v) {
     if (v === null || v === undefined || v === "") return "—";
@@ -134,15 +168,18 @@
     $("choices").innerHTML = "";
   }
   function findMatches(text) {
-    return products.map(p => ({p, score:similarity(text,p.name)})).sort((a,b)=>b.score-a.score);
+    return products.map(p => {
+      const result = similarity(text, p.name);
+      return {p, score:result.score, matched:result.matched, matchedWords:result.words};
+    }).sort((a,b)=>b.score-a.score);
   }
   function displayMatches(matches) {
     const best = matches[0], second = matches[1];
-    if (!best || best.score < .38) {
-      setStatus("No reliable product match yet. Move closer or show the product name clearly.");
+    if (!best || best.score < .42 || (best.matched < 2 && best.score < .78)) {
+      setStatus("Not enough matching product words yet. Show at least two clear words from the product name.");
       return;
     }
-    if (best.score < .58 || (second && best.score - second.score < .09)) {
+    if (best.score < .68 || (second && best.score - second.score < .12)) {
       $("productName").textContent = "More than one possible match";
       $("matchMeta").textContent = "Choose the correct product below. Similar product names are not selected automatically.";
       const box = $("choices"); box.innerHTML = ""; box.classList.remove("hidden");
@@ -163,15 +200,18 @@
     try {
       const w = video.videoWidth, h = video.videoHeight;
       if (!w || !h) return;
+      // Keep the scan region centred and cap its width to reduce OCR workload.
       const cropW = Math.round(w*.78), cropH = Math.round(h*.58);
       const sx = Math.round((w-cropW)/2), sy = Math.round((h-cropH)/2);
-      canvas.width = cropW; canvas.height = cropH;
-      ctx.drawImage(video,sx,sy,cropW,cropH,0,0,cropW,cropH);
+      const scale = Math.min(1, 1000 / cropW);
+      canvas.width = Math.max(1, Math.round(cropW * scale));
+      canvas.height = Math.max(1, Math.round(cropH * scale));
+      ctx.drawImage(video,sx,sy,cropW,cropH,0,0,canvas.width,canvas.height);
       const result = await worker.recognize(canvas);
       const text = result.data.text || "";
       const matches = findMatches(text);
       const best = matches[0];
-      if (best && best.score >= .42) {
+      if (best && best.score >= .42 && (best.matched >= 2 || best.score >= .78)) {
         const key = normalize(best.p.name);
         if (key === lastCandidate) repeatCount++; else { lastCandidate=key; repeatCount=1; }
         if (repeatCount >= 2) displayMatches(matches);
@@ -195,8 +235,8 @@
       $("startBtn").disabled=true; $("stopBtn").disabled=false;
       setStatus("Loading text recognition… this may take a little time the first time.");
       if (!worker) worker = await Tesseract.createWorker("eng");
-      setStatus("Camera ready. Hold the product label inside the green frame.");
-      scanTimer=setInterval(scanFrame,2400);
+      setStatus("Camera ready. Checking for a new frame every 0.5 seconds; OCR runs sequentially.");
+      scanTimer=setInterval(scanFrame,500);
     } catch (e) {
       setStatus("Could not start camera: " + e.message + ". Open this app over HTTPS and allow camera access.");
       stopCamera();
@@ -207,8 +247,9 @@
     if (stream) stream.getTracks().forEach(t=>t.stop()); stream=null;
     video.srcObject=null;
     $("startBtn").disabled=false; $("stopBtn").disabled=true;
-    if (worker) { worker.terminate(); worker=null; }
-    setStatus("Camera stopped.");
+    // Keep the OCR worker warm when the user stops and restarts the camera.
+    // This avoids downloading/reinitialising the language model on every restart.
+    setStatus("Camera stopped. Text recognition remains ready for the next scan.");
   }
   $("startBtn").addEventListener("click",startCamera);
   $("stopBtn").addEventListener("click",stopCamera);
