@@ -1,343 +1,1392 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#123b2a">
-  <meta name="description" content="Fast camera-based product information scanner">
-  <link rel="manifest" href="manifest.webmanifest">
-  <title>Product Scanner</title>
-  <!-- Load Tesseract.js via stable CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <style>
-    :root { color-scheme:dark; --bg:#08130e; --panel:#11251a; --green:#70d69b; --muted:#a8b9ae; --line:#294536; }
-    * { box-sizing:border-box }
-    body { margin:0; background:var(--bg); color:#f4faf6; font:16px system-ui,-apple-system,Segoe UI,sans-serif; }
-    header { padding:16px 18px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    h1 { margin:0; font-size:20px; letter-spacing:.2px; }
-    .sub { color:var(--muted); font-size:12px; margin-top:3px }
-    main { max-width:760px; margin:auto; padding:0 12px 28px; }
-    .camera-wrap { position:relative; background:#000; border:1px solid var(--line); border-radius:18px; overflow:hidden; min-height:240px; }
-    video { display:block; width:100%; aspect-ratio:3/4; max-height:68vh; object-fit:cover; background:#000; }
-    .scan-frame { pointer-events:none; position:absolute; left:6%; top:32%; width:88%; height:36%; border:2px solid rgba(112,214,155,.95); border-radius:14px; box-shadow:0 0 0 999px rgba(0,0,0,.24); }
-    .scan-hint { position:absolute; bottom:12px; left:12px; right:12px; text-align:center; background:#06100bd9; padding:8px; border-radius:10px; font-size:12px; color:#d7e9de; }
-    .controls { display:flex; gap:10px; margin:12px 0; }
-    button { border:0; border-radius:12px; padding:13px 16px; font-weight:700; font-size:14px; cursor:pointer; }
-    .primary { background:var(--green); color:#062012; flex:1; }
-    .secondary { background:#20372a; color:#f4faf6; }
-    button:disabled { opacity:.45; cursor:not-allowed }
-    .status { color:var(--muted); font-size:13px; min-height:20px; margin:8px 3px 12px; }
-    .product-card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px; }
-    .product-name { font-size:18px; font-weight:750; line-height:1.25; }
-    .prices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
-    .price { background:#1a3324; border-radius:12px; padding:11px 9px; min-width:0; }
-    .price small { color:var(--muted); display:block; font-size:11px; letter-spacing:.5px; }
-    .price strong { display:block; margin-top:4px; font-size:20px; overflow-wrap:anywhere; }
-    .match-meta { margin-top:12px; font-size:12px; color:var(--muted); }
-    .choices { display:grid; gap:8px; margin-top:12px; }
-    .choice { text-align:left; background:#1a3324; color:#fff; border:1px solid var(--line); line-height:1.5; }
-    .choice:active { border-color:var(--green); }
-    #selectionNote { color:#9be2b6; font-weight:650; }
-    #scanAgainBtn { width:100%; }
-    .foot { color:#83988a; font-size:11px; line-height:1.45; padding:12px 4px; }
-    .pill { color:#bce9cc; border:1px solid #386449; border-radius:99px; padding:5px 9px; font-size:11px; white-space:nowrap; }
-    .hidden { display:none !important }
-    @media (max-width:420px) { .prices { gap:6px } .price strong { font-size:17px } }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123b2a">
+<meta name="description" content="Fast camera-based product information scanner">
+<link rel="manifest" href="manifest.webmanifest">
+
+<title>Product Scanner</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+:root {
+  color-scheme:dark;
+  --bg:#08130e;
+  --panel:#11251a;
+  --green:#70d69b;
+  --muted:#a8b9ae;
+  --line:#294536;
+}
+
+* { box-sizing:border-box }
+
+body {
+  margin:0;
+  background:var(--bg);
+  color:#f4faf6;
+  font:16px system-ui,-apple-system,Segoe UI,sans-serif;
+}
+
+header {
+  padding:16px 18px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+h1 {
+  margin:0;
+  font-size:20px;
+  letter-spacing:.2px;
+}
+
+.sub {
+  color:var(--muted);
+  font-size:12px;
+  margin-top:3px;
+}
+
+main {
+  max-width:760px;
+  margin:auto;
+  padding:0 12px 28px;
+}
+
+.camera-wrap {
+  position:relative;
+  background:#000;
+  border:1px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+  min-height:240px;
+}
+
+video {
+  display:block;
+  width:100%;
+  aspect-ratio:3/4;
+  max-height:68vh;
+  object-fit:cover;
+  background:#000;
+}
+
+.scan-frame {
+  pointer-events:none;
+  position:absolute;
+  left:6%;
+  top:32%;
+  width:88%;
+  height:36%;
+  border:2px solid rgba(112,214,155,.95);
+  border-radius:14px;
+  box-shadow:0 0 0 999px rgba(0,0,0,.24);
+}
+
+.scan-hint {
+  position:absolute;
+  bottom:12px;
+  left:12px;
+  right:12px;
+  text-align:center;
+  background:#06100bd9;
+  padding:8px;
+  border-radius:10px;
+  font-size:12px;
+  color:#d7e9de;
+}
+
+.controls {
+  display:flex;
+  gap:10px;
+  margin:12px 0;
+}
+
+button {
+  border:0;
+  border-radius:12px;
+  padding:13px 16px;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.primary {
+  background:var(--green);
+  color:#062012;
+  flex:1;
+}
+
+.secondary {
+  background:#20372a;
+  color:#f4faf6;
+}
+
+button:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.status {
+  color:var(--muted);
+  font-size:13px;
+  min-height:20px;
+  margin:8px 3px 12px;
+  overflow-wrap:anywhere;
+}
+
+.product-card {
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+}
+
+.product-name {
+  font-size:18px;
+  font-weight:750;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+
+.prices {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:14px;
+}
+
+.price {
+  background:#1a3324;
+  border-radius:12px;
+  padding:11px 9px;
+  min-width:0;
+}
+
+.price small {
+  color:var(--muted);
+  display:block;
+  font-size:11px;
+  letter-spacing:.5px;
+}
+
+.price strong {
+  display:block;
+  margin-top:4px;
+  font-size:20px;
+  overflow-wrap:anywhere;
+}
+
+.match-meta {
+  margin-top:12px;
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.5;
+}
+
+.choices {
+  display:grid;
+  gap:8px;
+  margin-top:12px;
+}
+
+.choice {
+  text-align:left;
+  background:#1a3324;
+  color:#fff;
+  border:1px solid var(--line);
+  line-height:1.5;
+  width:100%;
+}
+
+.choice:active,
+.choice:focus-visible {
+  border-color:var(--green);
+  outline:none;
+}
+
+#selectionNote {
+  color:#9be2b6;
+  font-weight:650;
+}
+
+#scanAgainBtn { width:100% }
+
+.foot {
+  color:#83988a;
+  font-size:11px;
+  line-height:1.45;
+  padding:12px 4px;
+}
+
+.pill {
+  color:#bce9cc;
+  border:1px solid #386449;
+  border-radius:99px;
+  padding:5px 9px;
+  font-size:11px;
+  white-space:nowrap;
+}
+
+.hidden { display:none !important }
+
+@media (max-width:420px) {
+  .prices { gap:6px }
+  .price strong { font-size:17px }
+  .controls button { padding:12px 10px }
+}
+</style>
 </head>
+
 <body>
+
 <header>
-  <div><h1>Product Scanner</h1><div class="sub">Optimized Local Match Engine</div></div>
+  <div>
+    <h1>Product Scanner</h1>
+    <div class="sub">Optimized Local Match Engine</div>
+  </div>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
+
 <main>
+
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
     <div class="scan-frame"></div>
-    <div class="scan-hint">Keep the product name inside this horizontal frame</div>
+    <div class="scan-hint">
+      Keep the product name inside this horizontal frame
+    </div>
   </section>
+
   <div class="controls">
     <button class="primary" id="startBtn">Start camera</button>
     <button class="secondary" id="captureBtn" disabled>Capture now</button>
     <button class="secondary" id="stopBtn" disabled>Stop</button>
   </div>
+
   <div class="controls">
-    <button class="secondary hidden" id="scanAgainBtn">Scan another product</button>
+    <button class="secondary hidden" id="scanAgainBtn">
+      Scan another product
+    </button>
   </div>
-  <div class="status" id="status">Loading product list…</div>
+
+  <div class="status" id="status">
+    Loading product list…
+  </div>
+
   <section class="product-card">
-    <div class="product-name" id="productName">Point the camera at a product</div>
-    <div class="prices">
-      <div class="price"><small>MRP</small><strong id="mrp">—</strong></div>
-      <div class="price"><small>DP</small><strong id="dp">—</strong></div>
-      <div class="price"><small>POINTS</small><strong id="pv">—</strong></div>
+
+    <div class="product-name" id="productName">
+      Point the camera at a product
     </div>
-    <div class="match-meta" id="matchMeta">Product details will appear here when a confident match is found.</div>
+
+    <div class="prices">
+
+      <div class="price">
+        <small>MRP</small>
+        <strong id="mrp">—</strong>
+      </div>
+
+      <div class="price">
+        <small>DP</small>
+        <strong id="dp">—</strong>
+      </div>
+
+      <div class="price">
+        <small>POINTS</small>
+        <strong id="pv">—</strong>
+      </div>
+
+    </div>
+
+    <div class="match-meta" id="matchMeta">
+      Product details will appear here when a confident match is found.
+    </div>
+
     <div class="choices hidden" id="choices"></div>
+
     <div class="match-meta hidden" id="selectionNote"></div>
+
   </section>
-  <p class="foot">Fast mobile scanner using Tesseract with image downscaling, combined with a built-in robust fuzzy matching algorithm against your Excel database.</p>
+
+  <p class="foot">
+    Fast mobile scanner using Tesseract OCR, image downscaling,
+    intelligent fuzzy matching and your product database.
+  </p>
+
 </main>
+
 <canvas id="canvas" class="hidden"></canvas>
+
 <script>
 (() => {
-  "use strict";
-  const API_URL = "https://vestige-products-api.vinaykinnera3301.workers.dev/";
-  const $ = id => document.getElementById(id);
-  const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
-  let products = [], stream = null, worker = null, scanTimer = null;
-  let busy = false, lastFrameSample = null, stableFrames = 0, motionDetected = false;
-  let finalSelectionMade = false, autoFinalizeTimer = null;
-  const AUTO_FINALIZE_DELAY_MS = 3000;
+"use strict";
 
-  function setStatus(message) { $("status").textContent = message; }
-  function clearAutoFinalizeTimer() {
-    if (autoFinalizeTimer) clearTimeout(autoFinalizeTimer);
+// ==========================================
+// CONFIGURATION
+// ==========================================
+
+const API_URL =
+"https://vestige-products-api.vinaykinnera3301.workers.dev/";
+
+const AUTO_FINALIZE_DELAY_MS = 3000;
+
+const AUTO_MATCH_THRESHOLD = 0.72;
+
+const MIN_MATCH_THRESHOLD = 0.15;
+
+const MIN_MATCH_MARGIN = 0.14;
+
+const $ = id => document.getElementById(id);
+
+const video = $("video");
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
+
+// ==========================================
+// GLOBAL VARIABLES
+// ==========================================
+
+let products = [];
+let stream = null;
+let worker = null;
+
+let scanTimer = null;
+let autoFinalizeTimer = null;
+let productsLoading = null;
+
+let busy = false;
+let startingCamera = false;
+
+let lastFrameSample = null;
+let stableFrames = 0;
+
+let finalSelectionMade = false;
+let scanSession = 0;
+
+// ==========================================
+// STATUS
+// ==========================================
+
+function setStatus(message) {
+  $("status").textContent = message;
+}
+
+function clearAutoFinalizeTimer() {
+  if (autoFinalizeTimer) {
+    clearTimeout(autoFinalizeTimer);
     autoFinalizeTimer = null;
   }
-  function clearProductDisplay() {
-    clearAutoFinalizeTimer();
-    $("productName").textContent = "Point the camera at a product";
-    $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
-    $("matchMeta").textContent = "The top product matches will appear after capture.";
-    $("choices").innerHTML = ""; $("choices").classList.add("hidden");
-    $("selectionNote").textContent = ""; $("selectionNote").classList.add("hidden");
-  }
+}
 
-  async function loadProducts() {
+function clearScanTimer() {
+  if (scanTimer) {
+    clearInterval(scanTimer);
+    scanTimer = null;
+  }
+}
+
+function startScanMonitor() {
+  clearScanTimer();
+
+  if (!stream || finalSelectionMade) return;
+
+  scanTimer = setInterval(monitorSteadiness, 350);
+}
+
+// ==========================================
+// PRODUCT DISPLAY
+// ==========================================
+
+function clearProductDisplay() {
+  clearAutoFinalizeTimer();
+
+  $("productName").textContent =
+    "Point the camera at a product";
+
+  $("mrp").textContent = "—";
+  $("dp").textContent = "—";
+  $("pv").textContent = "—";
+
+  $("matchMeta").textContent =
+    "The top product matches will appear after capture.";
+
+  $("choices").innerHTML = "";
+  $("choices").classList.add("hidden");
+
+  $("selectionNote").textContent = "";
+  $("selectionNote").classList.add("hidden");
+}
+
+// ==========================================
+// LOAD PRODUCT DATABASE
+// ==========================================
+
+async function loadProducts() {
+
+  if (products.length) return true;
+
+  if (productsLoading) return productsLoading;
+
+  productsLoading = (async () => {
+
     $("apiBadge").textContent = "Connecting…";
+
     try {
-      const response = await fetch(API_URL, { method: "GET", mode: "cors", cache: "no-store", headers: { "Accept": "application/json" } });
-      if (!response.ok) throw new Error("API returned HTTP " + response.status);
+
+      const response = await fetch(API_URL, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        headers: {
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          "API returned HTTP " + response.status
+        );
+      }
+
       const data = await response.json();
-      if (!data || data.success !== true || !Array.isArray(data.products)) throw new Error(data?.error || "Invalid product API response.");
-      products = data.products.filter(p => p && String(p.name || "").trim());
-      if (!products.length) throw new Error("The product database is empty.");
-      $("apiBadge").textContent = products.length + " products loaded";
+
+      if (
+        !data ||
+        data.success !== true ||
+        !Array.isArray(data.products)
+      ) {
+        throw new Error(
+          data?.error || "Invalid product API response."
+        );
+      }
+
+      products = data.products.filter(p =>
+        p && String(p.name || "").trim()
+      );
+
+      if (!products.length) {
+        throw new Error("The product database is empty.");
+      }
+
+      $("apiBadge").textContent =
+        products.length + " products loaded";
+
       $("apiBadge").style.borderColor = "#386449";
-      setStatus("Product database ready. Start the camera to scan.");
+
+      setStatus(
+        "Product database ready. Start the camera to scan."
+      );
+
       return true;
+
     } catch (error) {
-      products = []; $("apiBadge").textContent = "API not connected";
+
+      products = [];
+
+      $("apiBadge").textContent = "API not connected";
       $("apiBadge").style.borderColor = "#a64b4b";
-      setStatus("Product API error: " + (error?.message || String(error)));
+
+      setStatus(
+        "Product API error: " +
+        (error?.message || String(error))
+      );
+
       return false;
     }
+
+  })();
+
+  try {
+    return await productsLoading;
+  } finally {
+    productsLoading = null;
+  }
+}
+
+// ==========================================
+// PRICE FORMATTING
+// ==========================================
+
+function formatMoney(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
   }
 
-  function formatMoney(value) {
-    if (value === null || value === undefined || value === "") return "—";
-    const n = Number(String(value).replace(/,/g, ""));
-    return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(value);
+  const n = Number(
+    String(value).replace(/,/g, "")
+  );
+
+  return Number.isFinite(n)
+    ? "₹" + n.toLocaleString("en-IN", {
+        maximumFractionDigits: 2
+      })
+    : String(value);
+}
+
+// ==========================================
+// TEXT NORMALIZATION
+// ==========================================
+
+function normalizeText(str) {
+
+  return String(str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getTokens(str) {
+
+  return normalizeText(str)
+    .split(" ")
+    .filter(token => token.length > 1);
+}
+
+// ==========================================
+// TOKEN SIMILARITY
+// ==========================================
+
+function levenshtein(a, b) {
+
+  if (a === b) return 0;
+
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  let previous = Array.from(
+    { length: b.length + 1 },
+    (_, i) => i
+  );
+
+  for (let i = 1; i <= a.length; i++) {
+
+    const current = [i];
+
+    for (let j = 1; j <= b.length; j++) {
+
+      const cost =
+        a[i - 1] === b[j - 1] ? 0 : 1;
+
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + cost
+      );
+    }
+
+    previous = current;
   }
 
-  // Built-in fuzzy similarity and matching engine
-  function getTokens(str) {
-    return String(str || "").toLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(t => t.length > 1);
+  return previous[b.length];
+}
+
+function tokenSimilarity(a, b) {
+
+  if (a === b) return 1;
+
+  if (
+    Math.min(a.length, b.length) >= 4 &&
+    (a.includes(b) || b.includes(a))
+  ) {
+    return 0.88;
   }
 
-  function scoreMatch(ocrText, productName) {
-    const ocrTokens = getTokens(ocrText);
-    const prodTokens = getTokens(productName);
-    if (!ocrTokens.length || !prodTokens.length) return 0;
+  const maxLength = Math.max(a.length, b.length);
 
-    let matchedCount = 0;
+  if (maxLength < 5) return 0;
+
+  const distance = levenshtein(a, b);
+
+  if (distance === 1) return 0.84;
+
+  if (distance === 2 && maxLength >= 8) {
+    return 0.72;
+  }
+
+  return 0;
+}
+
+// ==========================================
+// IMPROVED FUZZY MATCHING
+// ==========================================
+
+function scoreMatch(ocrText, productName) {
+
+  const ocrTokens = getTokens(ocrText);
+
+  const productTokens = [
+    ...new Set(getTokens(productName))
+  ];
+
+  if (
+    !ocrTokens.length ||
+    !productTokens.length
+  ) {
+    return {
+      score: 0,
+      matchedTokens: 0
+    };
+  }
+
+  let totalScore = 0;
+  let matchedTokens = 0;
+  let totalWeight = 0;
+
+  for (const pt of productTokens) {
+
+    let bestSimilarity = 0;
+
     for (const ot of ocrTokens) {
-      for (const pt of prodTokens) {
-        if (pt.includes(ot) || ot.includes(pt) || (ot.length >= 3 && pt.substring(0, 3) === ot.substring(0, 3))) {
-          matchedCount++;
-          break;
-        }
+
+      const similarity = tokenSimilarity(pt, ot);
+
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity;
       }
     }
-    return matchedCount / Math.max(ocrTokens.length, prodTokens.length);
+
+    const weight = Math.min(pt.length, 10);
+
+    totalScore += bestSimilarity * weight;
+    totalWeight += weight;
+
+    if (bestSimilarity >= 0.72) {
+      matchedTokens++;
+    }
   }
 
-  function findMatches(ocrText) {
-    if (!ocrText || !products.length) return [];
-    const scored = products.map(product => {
-      const score = scoreMatch(ocrText, product.name);
-      return { product, score };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 5);
+  return {
+    score: totalWeight
+      ? totalScore / totalWeight
+      : 0,
+
+    matchedTokens
+  };
+}
+
+// ==========================================
+// FIND TOP PRODUCT MATCHES
+// ==========================================
+
+function findMatches(ocrText) {
+
+  if (!ocrText || !products.length) {
+    return [];
   }
 
-  function selectProduct(item, automatic = false) {
-    if (finalSelectionMade) return;
-    clearAutoFinalizeTimer();
-    finalSelectionMade = true;
-    if (scanTimer) clearInterval(scanTimer);
-    const p = item.product;
-    $("productName").textContent = p.name || "Product";
-    $("mrp").textContent = formatMoney(p.MRP);
-    $("dp").textContent = formatMoney(p.DP);
-    $("pv").textContent = p.pv ?? "—";
-    $("matchMeta").textContent = (automatic ? "Automatically confirmed match" : "Selected product") + " · Match score: " + Math.round(item.score * 100) + "%";
-    $("choices").classList.add("hidden");
-    $("selectionNote").textContent = "✓ Confirmed: " + p.name;
-    $("selectionNote").classList.remove("hidden");
+  const scored = products.map(product => {
+
+    const result = scoreMatch(
+      ocrText,
+      product.name
+    );
+
+    return {
+      product,
+      score: result.score,
+      matchedTokens: result.matchedTokens
+    };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, 5);
+}
+
+// ==========================================
+// SAFE HTML
+// ==========================================
+
+function escapeHtml(value) {
+
+  return String(value).replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[c]
+  );
+}
+
+// ==========================================
+// SELECT PRODUCT
+// ==========================================
+
+function selectProduct(item, automatic = false) {
+
+  if (finalSelectionMade) return;
+
+  clearAutoFinalizeTimer();
+  clearScanTimer();
+
+  finalSelectionMade = true;
+
+  const p = item.product;
+
+  $("productName").textContent =
+    p.name || "Product";
+
+  $("mrp").textContent = formatMoney(p.MRP);
+  $("dp").textContent = formatMoney(p.DP);
+  $("pv").textContent = p.pv ?? "—";
+
+  $("matchMeta").textContent =
+    (automatic
+      ? "Automatically confirmed match"
+      : "Manually selected product") +
+    " · Match score: " +
+    Math.round(item.score * 100) +
+    "%";
+
+  $("choices").classList.add("hidden");
+
+  $("selectionNote").textContent =
+    "✓ Confirmed: " + p.name;
+
+  $("selectionNote").classList.remove("hidden");
+
+  $("scanAgainBtn").classList.remove("hidden");
+
+  $("captureBtn").disabled = true;
+
+  setStatus("Selected: " + p.name);
+}
+
+// ==========================================
+// DISPLAY MATCHES
+// ==========================================
+
+function displayMatches(matches) {
+
+  clearAutoFinalizeTimer();
+
+  const box = $("choices");
+
+  box.innerHTML = "";
+
+  if (
+    !matches.length ||
+    matches[0].score < MIN_MATCH_THRESHOLD
+  ) {
+
+    $("productName").textContent =
+      "No clear product match";
+
+    $("mrp").textContent = "—";
+    $("dp").textContent = "—";
+    $("pv").textContent = "—";
+
+    $("matchMeta").textContent =
+      "Product text was unclear. Try better lighting or move closer.";
+
+    box.classList.add("hidden");
+
     $("scanAgainBtn").classList.remove("hidden");
-    $("captureBtn").disabled = true;
-    setStatus("Selected: " + p.name);
+
+    setStatus(
+      "No useful match found. Try capturing again."
+    );
+
+    return;
   }
 
-  function displayMatches(matches) {
-    clearAutoFinalizeTimer();
-    const box = $("choices"); box.innerHTML = "";
-    if (!matches.length || matches[0].score < 0.15) {
-      $("productName").textContent = "No clear product match";
-      $("matchMeta").textContent = "Product text was unclear. Try better lighting.";
-      box.classList.add("hidden"); setStatus("No useful match found. Tap capture again.");
-      $("scanAgainBtn").classList.remove("hidden"); return;
-    }
-    
-    $("productName").textContent = "Checking top product match…";
-    $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
-    
-    const top = matches[0];
-    const canAutoFinalize = top.score >= 0.50;
-    
-    $("matchMeta").textContent = canAutoFinalize
-      ? "Top match confirmed automatically in 3 seconds. Tap another to override."
-      : "Please select the correct product match below.";
+  $("productName").textContent =
+    "Checking top product matches…";
 
-    matches.forEach((item, index) => {
-      const button = document.createElement("button");
-      button.className = "choice";
-      button.innerHTML = "<strong>" + (index + 1) + ". " + escapeHtml(item.product.name) + "</strong><br><span style=\"color:#bce9cc;font-size:12px\">Match score: " + Math.round(item.score * 100) + "%</span>";
-      button.addEventListener("click", () => selectProduct(item, false));
-      box.appendChild(button);
+  $("mrp").textContent = "—";
+  $("dp").textContent = "—";
+  $("pv").textContent = "—";
+
+  const top = matches[0];
+  const second = matches[1];
+
+  const margin = second
+    ? top.score - second.score
+    : top.score;
+
+  const highConfidence =
+    top.score >= AUTO_MATCH_THRESHOLD &&
+    (
+      margin >= MIN_MATCH_MARGIN ||
+      top.score >= 0.92
+    ) &&
+    (
+      top.matchedTokens >= 2 ||
+      top.score >= 0.92
+    );
+
+  $("matchMeta").textContent = highConfidence
+    ? "Strong match detected. Automatically confirming in 3 seconds. Tap another product to override."
+    : "Please select the correct product from the matches below.";
+
+  matches.forEach((item, index) => {
+
+    const button = document.createElement("button");
+
+    button.className = "choice";
+
+    button.innerHTML =
+      "<strong>" +
+      (index + 1) +
+      ". " +
+      escapeHtml(item.product.name) +
+      "</strong><br>" +
+      "<span style=\"color:#bce9cc;font-size:12px\">" +
+      "Match score: " +
+      Math.round(item.score * 100) +
+      "%" +
+      "</span>";
+
+    button.addEventListener("click", () => {
+      selectProduct(item, false);
     });
-    box.classList.remove("hidden");
-    $("scanAgainBtn").classList.add("hidden");
 
-    if (canAutoFinalize) {
-      setStatus("Top match: " + Math.round(top.score * 100) + "%. Confirming automatically…");
-      autoFinalizeTimer = setTimeout(() => {
-        if (!finalSelectionMade) selectProduct(top, true);
-      }, AUTO_FINALIZE_DELAY_MS);
-    } else {
-      setStatus("Select the correct product from the options.");
-    }
-  }
+    box.appendChild(button);
+  });
 
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  }
+  box.classList.remove("hidden");
 
-  function getPortraitCrop() {
-    const vw = video.videoWidth, vh = video.videoHeight, rect = video.getBoundingClientRect();
-    const scale = Math.max(rect.width / vw, rect.height / vh);
-    const visibleW = rect.width / scale, visibleH = rect.height / scale;
-    const offsetX = (vw - visibleW) / 2, offsetY = (vh - visibleH) / 2;
-    const cropW = visibleW * 0.88, cropH = visibleH * 0.36;
-    return { sx: Math.max(0, offsetX + (visibleW - cropW) / 2), sy: Math.max(0, offsetY + (visibleH - cropH) / 2), sw: Math.min(cropW, vw), sh: Math.min(cropH, vh) };
-  }
+  $("scanAgainBtn").classList.add("hidden");
 
-  function frameIsStable() {
-    const sample = document.createElement("canvas"); sample.width = 32; sample.height = 40;
-    const sctx = sample.getContext("2d", { willReadFrequently: true });
-    sctx.drawImage(video, 0, 0, sample.width, sample.height);
-    const data = sctx.getImageData(0, 0, sample.width, sample.height).data;
-    const gray = new Uint8Array(sample.width * sample.height);
-    for (let i = 0, j = 0; i < data.length; i += 4, j++) gray[j] = (data[i] * .299 + data[i + 1] * .587 + data[i + 2] * .114) | 0;
-    if (!lastFrameSample) { lastFrameSample = gray; return null; }
-    let diff = 0; for (let i = 0; i < gray.length; i++) diff += Math.abs(gray[i] - lastFrameSample[i]);
-    diff /= gray.length; lastFrameSample = gray;
-    return diff < 24;
-  }
+  if (highConfidence) {
 
-  async function captureAndRecognize(manual = false) {
-    if (busy || !stream || finalSelectionMade || video.readyState < 2) return;
-    busy = true; 
-    if (scanTimer) clearInterval(scanTimer);
-    $("captureBtn").disabled = true;
-    setStatus(manual ? "Capturing photo…" : "Steady frame detected. Scanning…");
+    setStatus(
+      "Strong match: " +
+      Math.round(top.score * 100) +
+      "%. Confirming automatically…"
+    );
 
-    try {
-      const crop = getPortraitCrop();
-      const scale = Math.min(1, 700 / Math.max(crop.sw, crop.sh));
-      canvas.width = Math.max(1, Math.round(crop.sw * scale)); 
-      canvas.height = Math.max(1, Math.round(crop.sh * scale));
-      
-      ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
-      
-      const result = await worker.recognize(canvas);
-      const recognizedText = result?.data?.text || "";
-      
-      const matches = findMatches(recognizedText);
-      displayMatches(matches);
-    } catch (error) {
-      setStatus("Recognition error: " + (error?.message || String(error)));
-      $("scanAgainBtn").classList.remove("hidden");
-    } finally {
-      busy = false;
-      if (stream && !finalSelectionMade) $("captureBtn").disabled = false;
-    }
-  }
+    autoFinalizeTimer = setTimeout(() => {
 
-  function monitorSteadiness() {
-    if (busy || !stream || finalSelectionMade || video.readyState < 2) return;
-    const stable = frameIsStable();
-    if (stable === false) { motionDetected = true; stableFrames = 0; }
-    else if (stable === true && motionDetected) stableFrames++;
-    else stableFrames = 0;
-    if (stableFrames >= 3) { stableFrames = 0; motionDetected = false; captureAndRecognize(false); }
-  }
-
-  async function startCamera() {
-    try {
-      if (!products.length && !(await loadProducts())) return;
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access unavailable over non-HTTPS.");
-      setStatus("Starting camera & text engine…");
-      
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-      video.srcObject = stream; await video.play();
-      
-      $("startBtn").disabled = true; $("stopBtn").disabled = false; $("captureBtn").disabled = false;
-
-      if (!worker) {
-        worker = await Tesseract.createWorker("eng");
-        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+      if (!finalSelectionMade) {
+        selectProduct(top, true);
       }
 
-      clearAutoFinalizeTimer();
-      lastFrameSample = null; stableFrames = 0; motionDetected = false; finalSelectionMade = false;
-      setStatus("Camera ready. Hold product steady or tap Capture now.");
-      scanTimer = setInterval(monitorSteadiness, 350);
-    } catch (error) {
-      setStatus("Camera error: " + (error?.message || String(error)));
-      stopCamera(false);
+    }, AUTO_FINALIZE_DELAY_MS);
+
+  } else {
+
+    setStatus(
+      "Select the correct product from the options."
+    );
+  }
+}
+
+// ==========================================
+// CAMERA CROP
+// ==========================================
+
+function getPortraitCrop() {
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+
+  const rect = video.getBoundingClientRect();
+
+  if (!vw || !vh || !rect.width || !rect.height) {
+    throw new Error("Camera frame is not ready.");
+  }
+
+  const scale = Math.max(
+    rect.width / vw,
+    rect.height / vh
+  );
+
+  const visibleW = rect.width / scale;
+  const visibleH = rect.height / scale;
+
+  const offsetX = (vw - visibleW) / 2;
+  const offsetY = (vh - visibleH) / 2;
+
+  const cropW = visibleW * 0.88;
+  const cropH = visibleH * 0.36;
+
+  return {
+    sx: Math.max(
+      0,
+      offsetX + (visibleW - cropW) / 2
+    ),
+
+    sy: Math.max(
+      0,
+      offsetY + (visibleH - cropH) / 2
+    ),
+
+    sw: Math.min(cropW, vw),
+    sh: Math.min(cropH, vh)
+  };
+}
+
+// ==========================================
+// FRAME STABILITY DETECTION
+// ==========================================
+
+function frameIsStable() {
+
+  if (!video.videoWidth || !video.videoHeight) {
+    return null;
+  }
+
+  const crop = getPortraitCrop();
+
+  const sample = document.createElement("canvas");
+
+  sample.width = 32;
+  sample.height = 40;
+
+  const sctx = sample.getContext(
+    "2d",
+    { willReadFrequently: true }
+  );
+
+  sctx.drawImage(
+    video,
+    crop.sx,
+    crop.sy,
+    crop.sw,
+    crop.sh,
+    0,
+    0,
+    sample.width,
+    sample.height
+  );
+
+  const data = sctx.getImageData(
+    0,
+    0,
+    sample.width,
+    sample.height
+  ).data;
+
+  const gray = new Uint8Array(
+    sample.width * sample.height
+  );
+
+  for (
+    let i = 0, j = 0;
+    i < data.length;
+    i += 4, j++
+  ) {
+
+    gray[j] = (
+      data[i] * 0.299 +
+      data[i + 1] * 0.587 +
+      data[i + 2] * 0.114
+    ) | 0;
+  }
+
+  if (!lastFrameSample) {
+    lastFrameSample = gray;
+    return null;
+  }
+
+  let diff = 0;
+
+  for (let i = 0; i < gray.length; i++) {
+    diff += Math.abs(
+      gray[i] - lastFrameSample[i]
+    );
+  }
+
+  diff /= gray.length;
+
+  lastFrameSample = gray;
+
+  return diff < 24;
+}
+
+// ==========================================
+// CAPTURE AND OCR
+// ==========================================
+
+async function captureAndRecognize(manual = false) {
+
+  if (
+    busy ||
+    !stream ||
+    finalSelectionMade ||
+    video.readyState < 2 ||
+    !worker
+  ) {
+    return;
+  }
+
+  busy = true;
+
+  const currentSession = scanSession;
+
+  clearScanTimer();
+
+  $("captureBtn").disabled = true;
+
+  setStatus(
+    manual
+      ? "Capturing photo…"
+      : "Steady frame detected. Scanning…"
+  );
+
+  try {
+
+    const crop = getPortraitCrop();
+
+    const scale = Math.min(
+      1,
+      1000 / Math.max(crop.sw, crop.sh)
+    );
+
+    canvas.width = Math.max(
+      1,
+      Math.round(crop.sw * scale)
+    );
+
+    canvas.height = Math.max(
+      1,
+      Math.round(crop.sh * scale)
+    );
+
+    ctx.drawImage(
+      video,
+      crop.sx,
+      crop.sy,
+      crop.sw,
+      crop.sh,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const result = await worker.recognize(canvas);
+
+    if (
+      currentSession !== scanSession ||
+      !stream
+    ) {
+      return;
+    }
+
+    const recognizedText =
+      result?.data?.text || "";
+
+    if (!recognizedText.trim()) {
+
+      $("productName").textContent =
+        "No text detected";
+
+      $("matchMeta").textContent =
+        "Move closer to the product name and improve lighting.";
+
+      $("scanAgainBtn").classList.remove("hidden");
+
+      setStatus(
+        "OCR could not read the text. Try capturing again."
+      );
+
+      return;
+    }
+
+    const matches = findMatches(recognizedText);
+
+    displayMatches(matches);
+
+  } catch (error) {
+
+    if (currentSession === scanSession) {
+
+      setStatus(
+        "Recognition error: " +
+        (error?.message || String(error))
+      );
+
+      $("scanAgainBtn").classList.remove("hidden");
+    }
+
+  } finally {
+
+    busy = false;
+
+    if (
+      stream &&
+      !finalSelectionMade &&
+      currentSession === scanSession
+    ) {
+      $("captureBtn").disabled = false;
     }
   }
+}
 
-  function stopCamera(updateStatus = true) {
-    if (scanTimer) clearInterval(scanTimer); scanTimer = null;
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    stream = null; video.srcObject = null; lastFrameSample = null;
-    $("startBtn").disabled = false; $("stopBtn").disabled = true; $("captureBtn").disabled = true;
-    if (updateStatus) status("Camera stopped.");
+// ==========================================
+// AUTOMATIC STEADINESS MONITOR
+// ==========================================
+
+function monitorSteadiness() {
+
+  if (
+    busy ||
+    !stream ||
+    finalSelectionMade ||
+    video.readyState < 2
+  ) {
+    return;
   }
 
-  function scanAnotherProduct() {
+  try {
+
+    const stable = frameIsStable();
+
+    if (stable === true) {
+      stableFrames++;
+    } else {
+      stableFrames = 0;
+    }
+
+    if (stableFrames >= 3) {
+
+      stableFrames = 0;
+
+      captureAndRecognize(false);
+    }
+
+  } catch (error) {
+
+    setStatus(
+      "Frame monitoring error: " +
+      (error?.message || String(error))
+    );
+  }
+}
+
+// ==========================================
+// CAMERA START
+// ==========================================
+
+async function startCamera() {
+
+  if (startingCamera || stream) return;
+
+  startingCamera = true;
+
+  $("startBtn").disabled = true;
+
+  try {
+
+    if (!products.length) {
+
+      if (!(await loadProducts())) {
+        throw new Error(
+          "Product database could not be loaded."
+        );
+      }
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(
+        "Camera access unavailable. Use HTTPS."
+      );
+    }
+
+    if (typeof Tesseract === "undefined") {
+      throw new Error(
+        "Tesseract OCR could not be loaded. Check your internet connection."
+      );
+    }
+
+    setStatus(
+      "Starting camera and text recognition engine…"
+    );
+
+    const newStream =
+      await navigator.mediaDevices.getUserMedia({
+
+        video: {
+          facingMode: {
+            ideal: "environment"
+          }
+        },
+
+        audio: false
+      });
+
+    stream = newStream;
+
+    video.srcObject = stream;
+
+    await video.play();
+
+    if (!worker) {
+
+      setStatus(
+        "Loading OCR recognition engine…"
+      );
+
+      worker = await Tesseract.createWorker("eng");
+
+      await worker.setParameters({
+
+        tessedit_pageseg_mode: "11",
+
+        preserve_interword_spaces: "1"
+      });
+    }
+
+    scanSession++;
+
     clearAutoFinalizeTimer();
-    finalSelectionMade = false; clearProductDisplay();
+    clearScanTimer();
+
+    lastFrameSample = null;
+    stableFrames = 0;
+    finalSelectionMade = false;
+
+    $("startBtn").disabled = true;
+    $("stopBtn").disabled = false;
+    $("captureBtn").disabled = false;
+
     $("scanAgainBtn").classList.add("hidden");
-    if (stream) {
-      lastFrameSample = null; stableFrames = 0; motionDetected = false; $("captureBtn").disabled = false;
-      setStatus("Ready for next product.");
-      scanTimer = setInterval(monitorSteadiness, 350);
-    } else setStatus("Start camera to scan.");
+
+    setStatus(
+      "Camera ready. Hold product steady or tap Capture now."
+    );
+
+    startScanMonitor();
+
+  } catch (error) {
+
+    setStatus(
+      "Camera error: " +
+      (error?.message || String(error))
+    );
+
+    stopCamera(false);
+
+  } finally {
+
+    startingCamera = false;
+
+    if (!stream) {
+      $("startBtn").disabled = false;
+    }
+  }
+}
+
+// ==========================================
+// CAMERA STOP
+// ==========================================
+
+function stopCamera(updateStatus = true) {
+
+  scanSession++;
+
+  clearScanTimer();
+  clearAutoFinalizeTimer();
+
+  if (stream) {
+
+    stream.getTracks().forEach(track => {
+      track.stop();
+    });
   }
 
-  $("startBtn").addEventListener("click", startCamera);
-  $("stopBtn").addEventListener("click", () => stopCamera());
-  $("captureBtn").addEventListener("click", () => captureAndRecognize(true));
-  $("scanAgainBtn").addEventListener("click", scanAnotherProduct);
+  stream = null;
 
-  loadProducts();
+  video.srcObject = null;
+
+  lastFrameSample = null;
+  stableFrames = 0;
+
+  $("startBtn").disabled = startingCamera;
+  $("stopBtn").disabled = true;
+  $("captureBtn").disabled = true;
+
+  if (updateStatus) {
+    setStatus("Camera stopped.");
+  }
+}
+
+// ==========================================
+// SCAN ANOTHER PRODUCT
+// ==========================================
+
+function scanAnotherProduct() {
+
+  clearAutoFinalizeTimer();
+  clearScanTimer();
+
+  scanSession++;
+
+  finalSelectionMade = false;
+
+  clearProductDisplay();
+
+  $("scanAgainBtn").classList.add("hidden");
+
+  lastFrameSample = null;
+  stableFrames = 0;
+
+  if (stream) {
+
+    $("captureBtn").disabled = false;
+
+    setStatus(
+      "Ready for next product. Hold the product steady."
+    );
+
+    startScanMonitor();
+
+  } else {
+
+    setStatus("Start camera to scan.");
+  }
+}
+
+// ==========================================
+// EVENT LISTENERS
+// ==========================================
+
+$("startBtn").addEventListener(
+  "click",
+  startCamera
+);
+
+$("stopBtn").addEventListener(
+  "click",
+  () => stopCamera()
+);
+
+$("captureBtn").addEventListener(
+  "click",
+  () => captureAndRecognize(true)
+);
+
+$("scanAgainBtn").addEventListener(
+  "click",
+  scanAnotherProduct
+);
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+
+loadProducts();
+
 })();
 </script>
+
 </body>
 </html>
