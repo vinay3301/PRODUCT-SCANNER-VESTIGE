@@ -214,7 +214,16 @@ button:disabled {
   font-weight:650;
 }
 
-#scanAgainBtn { width:100% }
+#scanAgainBtn,
+#addToCartBtn {
+  width:100%;
+}
+
+.add-button {
+  background:var(--green);
+  color:#062012;
+  margin-top:14px;
+}
 
 .foot {
   color:#83988a;
@@ -234,10 +243,203 @@ button:disabled {
 
 .hidden { display:none !important }
 
+/* =====================================
+   CART DESIGN
+===================================== */
+
+.cart-section {
+  margin-top:18px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+}
+
+.cart-heading {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:14px;
+}
+
+.cart-heading h2 {
+  margin:0;
+  font-size:19px;
+}
+
+.cart-count {
+  background:#203d2b;
+  color:#bce9cc;
+  border:1px solid #386449;
+  border-radius:99px;
+  padding:5px 10px;
+  font-size:12px;
+  font-weight:700;
+}
+
+.cart-name-label {
+  color:var(--muted);
+  font-size:12px;
+  display:block;
+  margin-bottom:6px;
+}
+
+.cart-name-input {
+  width:100%;
+  background:#081a10;
+  color:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px;
+  font-size:14px;
+  outline:none;
+}
+
+.cart-name-input:focus {
+  border-color:var(--green);
+}
+
+.cart-empty {
+  text-align:center;
+  color:var(--muted);
+  padding:26px 10px;
+  font-size:13px;
+  line-height:1.6;
+}
+
+.cart-list {
+  display:grid;
+  gap:10px;
+  margin-top:14px;
+}
+
+.cart-item {
+  background:#1a3324;
+  border:1px solid var(--line);
+  border-radius:13px;
+  padding:12px;
+}
+
+.cart-item-name {
+  font-weight:700;
+  font-size:14px;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+
+.cart-item-prices {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  color:var(--muted);
+  font-size:11px;
+  margin-top:7px;
+}
+
+.cart-item-bottom {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-top:12px;
+}
+
+.cart-item-subtotal {
+  font-size:12px;
+  line-height:1.6;
+  color:#c4d8ca;
+}
+
+.quantity-controls {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:#0c2014;
+  padding:5px;
+  border-radius:10px;
+}
+
+.quantity-btn {
+  width:34px;
+  height:34px;
+  padding:0;
+  border-radius:8px;
+  background:#294936;
+  color:#fff;
+  font-size:20px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.quantity-value {
+  min-width:18px;
+  text-align:center;
+  font-size:15px;
+  font-weight:800;
+}
+
+.cart-summary {
+  margin-top:16px;
+  padding:14px;
+  border-radius:13px;
+  background:#0b1d12;
+  border:1px solid var(--line);
+}
+
+.summary-heading {
+  font-size:14px;
+  font-weight:750;
+  margin-bottom:12px;
+}
+
+.summary-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-top:9px;
+  font-size:13px;
+  color:#c5d8cb;
+}
+
+.summary-row strong {
+  color:#fff;
+  font-size:15px;
+}
+
+.summary-row.total {
+  border-top:1px solid var(--line);
+  padding-top:12px;
+  margin-top:13px;
+}
+
+.summary-row.total strong {
+  color:var(--green);
+  font-size:19px;
+}
+
+.clear-cart-btn {
+  width:100%;
+  margin-top:12px;
+  background:#392321;
+  color:#ffd2cc;
+  border:1px solid #69413b;
+}
+
 @media (max-width:420px) {
   .prices { gap:6px }
   .price strong { font-size:17px }
   .controls button { padding:12px 10px }
+
+  .cart-item-bottom {
+    align-items:flex-end;
+  }
+
+  .quantity-controls {
+    gap:8px;
+  }
 }
 </style>
 </head>
@@ -309,11 +511,84 @@ button:disabled {
 
     <div class="match-meta hidden" id="selectionNote"></div>
 
+    <button class="primary add-button hidden" id="addToCartBtn">
+      Add to cart
+    </button>
+
+  </section>
+
+  <!-- ==================================
+       SHOPPING CART
+  =================================== -->
+
+  <section class="cart-section" id="cartSection">
+
+    <div class="cart-heading">
+      <h2>Shopping Cart</h2>
+      <span class="cart-count" id="cartCount">0 items</span>
+    </div>
+
+    <label class="cart-name-label" for="cartName">
+      Cart / Customer name (optional)
+    </label>
+
+    <input
+      type="text"
+      id="cartName"
+      class="cart-name-input"
+      placeholder="Enter customer or order name"
+      autocomplete="off"
+    >
+
+    <div id="cartEmpty" class="cart-empty">
+      <div style="font-size:30px;margin-bottom:8px">🛒</div>
+      Your cart is empty.<br>
+      Scan a product and tap Add to cart.
+    </div>
+
+    <div class="cart-list" id="cartList"></div>
+
+    <div class="cart-summary hidden" id="cartSummary">
+
+      <div class="summary-heading">Cart Summary</div>
+
+      <div class="summary-row">
+        <span>Total products</span>
+        <strong id="totalProductTypes">0</strong>
+      </div>
+
+      <div class="summary-row">
+        <span>Total quantity</span>
+        <strong id="totalQuantity">0</strong>
+      </div>
+
+      <div class="summary-row">
+        <span>Total MRP</span>
+        <strong id="totalMRP">₹0</strong>
+      </div>
+
+      <div class="summary-row total">
+        <span>Total DP</span>
+        <strong id="totalDP">₹0</strong>
+      </div>
+
+      <div class="summary-row">
+        <span>Total PV</span>
+        <strong id="totalPV">0</strong>
+      </div>
+
+    </div>
+
+    <button class="clear-cart-btn hidden" id="clearCartBtn">
+      Clear entire cart
+    </button>
+
   </section>
 
   <p class="foot">
     Enhanced camera scanner using multi-pass OCR, image processing,
     high-resolution capture and intelligent product matching.
+    Cart data is saved in this browser.
   </p>
 
 </main>
@@ -332,18 +607,14 @@ const API_URL =
 "https://vestige-products-api.vinaykinnera3301.workers.dev/";
 
 const AUTO_FINALIZE_DELAY_MS = 3000;
-
-// Automatically select the top match at 62% or higher.
 const AUTO_MATCH_THRESHOLD = 0.62;
-
-// Minimum score for a product to appear in the choices.
 const MIN_MATCH_THRESHOLD = 0.20;
 
-// Maximum processing image dimension.
 const OCR_MAX_DIMENSION = 2000;
-
-// Upscaling factor for the camera crop.
 const OCR_UPSCALE_FACTOR = 1.7;
+
+// Cart storage key
+const CART_STORAGE_KEY = "productScannerCart_v1";
 
 // ==========================================
 // ELEMENTS
@@ -353,6 +624,7 @@ const $ = id => document.getElementById(id);
 
 const video = $("video");
 const canvas = $("canvas");
+
 const ctx = canvas.getContext("2d", {
   willReadFrequently: true
 });
@@ -377,6 +649,13 @@ let stableFrames = 0;
 
 let finalSelectionMade = false;
 let scanSession = 0;
+
+// Currently selected product
+let selectedProduct = null;
+
+// Cart data
+let cart = [];
+let cartName = "";
 
 // ==========================================
 // STATUS
@@ -415,6 +694,8 @@ function startScanMonitor() {
 function clearProductDisplay() {
   clearAutoFinalizeTimer();
 
+  selectedProduct = null;
+
   $("productName").textContent =
     "Point the camera at a product";
 
@@ -430,6 +711,8 @@ function clearProductDisplay() {
 
   $("selectionNote").textContent = "";
   $("selectionNote").classList.add("hidden");
+
+  $("addToCartBtn").classList.add("hidden");
 }
 
 // ==========================================
@@ -522,6 +805,23 @@ async function loadProducts() {
 // PRICE FORMATTING
 // ==========================================
 
+function numericValue(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return 0;
+  }
+
+  const n = Number(
+    String(value).replace(/,/g, "").replace(/[^\d.-]/g, "")
+  );
+
+  return Number.isFinite(n) ? n : 0;
+}
+
 function formatMoney(value) {
 
   if (
@@ -532,16 +832,381 @@ function formatMoney(value) {
     return "—";
   }
 
-  const n = Number(
-    String(value).replace(/,/g, "")
+  const n = numericValue(value);
+
+  return "₹" + n.toLocaleString("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCartMoney(value) {
+  return "₹" + Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+// ==========================================
+// CART STORAGE
+// ==========================================
+
+function saveCart() {
+
+  try {
+
+    localStorage.setItem(
+      CART_STORAGE_KEY,
+      JSON.stringify({
+        cartName,
+        cart
+      })
+    );
+
+  } catch (error) {
+
+    console.warn("Could not save cart:", error);
+
+    setStatus(
+      "Warning: Cart could not be saved in browser storage."
+    );
+  }
+}
+
+function loadCartFromStorage() {
+
+  try {
+
+    const saved = localStorage.getItem(
+      CART_STORAGE_KEY
+    );
+
+    if (!saved) {
+      cart = [];
+      cartName = "";
+      return;
+    }
+
+    const data = JSON.parse(saved);
+
+    cartName = String(data.cartName || "");
+
+    cart = Array.isArray(data.cart)
+      ? data.cart
+          .filter(item =>
+            item &&
+            item.product &&
+            Number(item.quantity) > 0
+          )
+          .map(item => ({
+            key: String(
+              item.key ||
+              normalizeText(item.product.name)
+            ),
+            product: item.product,
+            quantity: Math.max(
+              1,
+              Math.floor(Number(item.quantity))
+            )
+          }))
+      : [];
+
+  } catch (error) {
+
+    console.warn("Could not restore cart:", error);
+
+    cart = [];
+    cartName = "";
+  }
+
+  $("cartName").value = cartName;
+
+  renderCart();
+}
+
+// ==========================================
+// CART PRODUCT KEY
+// ==========================================
+
+function getCartProductKey(product) {
+
+  return normalizeText(product?.name || "");
+}
+
+// ==========================================
+// ADD PRODUCT TO CART
+// ==========================================
+
+function addSelectedProductToCart() {
+
+  if (!selectedProduct) {
+    return;
+  }
+
+  const product = selectedProduct;
+
+  const key = getCartProductKey(product);
+
+  if (!key) {
+    setStatus("Cannot add this product because its name is missing.");
+    return;
+  }
+
+  const existing = cart.find(item =>
+    item.key === key
   );
 
-  return Number.isFinite(n)
-    ? "₹" + n.toLocaleString("en-IN", {
-        maximumFractionDigits: 2
-      })
-    : String(value);
+  if (existing) {
+
+    // Same product scanned again:
+    // increase existing quantity.
+    existing.quantity += 1;
+
+  } else {
+
+    // New product starts at quantity 1.
+    cart.push({
+      key,
+      product: {
+        name: product.name,
+        MRP: product.MRP,
+        DP: product.DP,
+        pv: product.pv
+      },
+      quantity: 1
+    });
+  }
+
+  saveCart();
+  renderCart();
+
+  $("addToCartBtn").classList.add("hidden");
+
+  $("selectionNote").textContent =
+    "✓ Added to cart. Quantity is now " +
+    cart.find(item => item.key === key).quantity +
+    ".";
+
+  $("selectionNote").classList.remove("hidden");
+
+  $("scanAgainBtn").classList.remove("hidden");
+
+  setStatus(
+    "Added to cart: " +
+    product.name +
+    ". You can scan another product."
+  );
 }
+
+// ==========================================
+// CHANGE CART QUANTITY
+// ==========================================
+
+function changeCartQuantity(key, change) {
+
+  const item = cart.find(item =>
+    item.key === key
+  );
+
+  if (!item) return;
+
+  item.quantity += change;
+
+  // Quantity reaching zero removes the item.
+  // No separate delete button is needed.
+  if (item.quantity <= 0) {
+
+    cart = cart.filter(cartItem =>
+      cartItem.key !== key
+    );
+  }
+
+  saveCart();
+  renderCart();
+}
+
+// ==========================================
+// CLEAR ENTIRE CART
+// ==========================================
+
+function clearEntireCart() {
+
+  if (!cart.length) return;
+
+  const confirmed = confirm(
+    "Are you sure you want to clear the entire cart?"
+  );
+
+  if (!confirmed) return;
+
+  cart = [];
+
+  saveCart();
+  renderCart();
+
+  setStatus("Cart cleared.");
+}
+
+// ==========================================
+// RENDER CART
+// ==========================================
+
+function renderCart() {
+
+  const list = $("cartList");
+
+  list.innerHTML = "";
+
+  let totalQuantity = 0;
+  let totalMRP = 0;
+  let totalDP = 0;
+  let totalPV = 0;
+
+  cart.forEach(item => {
+
+    const product = item.product;
+    const quantity = item.quantity;
+
+    const mrp = numericValue(product.MRP);
+    const dp = numericValue(product.DP);
+    const pv = numericValue(product.pv);
+
+    totalQuantity += quantity;
+    totalMRP += mrp * quantity;
+    totalDP += dp * quantity;
+    totalPV += pv * quantity;
+
+    const row = document.createElement("div");
+
+    row.className = "cart-item";
+
+    row.innerHTML = `
+      <div class="cart-item-name">
+        ${escapeHtml(product.name)}
+      </div>
+
+      <div class="cart-item-prices">
+        <span>MRP: ${escapeHtml(formatMoney(product.MRP))}</span>
+        <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
+        <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
+      </div>
+
+      <div class="cart-item-bottom">
+
+        <div class="cart-item-subtotal">
+          <div>DP Total: <strong>${escapeHtml(formatCartMoney(dp * quantity))}</strong></div>
+          <div>PV Total: <strong>${(pv * quantity).toLocaleString("en-IN")}</strong></div>
+        </div>
+
+        <div class="quantity-controls">
+
+          <button
+            type="button"
+            class="quantity-btn"
+            data-action="decrease"
+            data-key="${escapeHtml(item.key)}"
+            aria-label="Decrease quantity"
+          >−</button>
+
+          <span class="quantity-value">
+            ${quantity}
+          </span>
+
+          <button
+            type="button"
+            class="quantity-btn"
+            data-action="increase"
+            data-key="${escapeHtml(item.key)}"
+            aria-label="Increase quantity"
+          >+</button>
+
+        </div>
+
+      </div>
+    `;
+
+    list.appendChild(row);
+  });
+
+  const hasItems = cart.length > 0;
+
+  $("cartEmpty").classList.toggle(
+    "hidden",
+    hasItems
+  );
+
+  $("cartSummary").classList.toggle(
+    "hidden",
+    !hasItems
+  );
+
+  $("clearCartBtn").classList.toggle(
+    "hidden",
+    !hasItems
+  );
+
+  $("cartCount").textContent =
+    totalQuantity +
+    (totalQuantity === 1 ? " item" : " items");
+
+  $("totalProductTypes").textContent =
+    cart.length;
+
+  $("totalQuantity").textContent =
+    totalQuantity;
+
+  $("totalMRP").textContent =
+    formatCartMoney(totalMRP);
+
+  $("totalDP").textContent =
+    formatCartMoney(totalDP);
+
+  $("totalPV").textContent =
+    totalPV.toLocaleString("en-IN", {
+      maximumFractionDigits: 2
+    });
+}
+
+// ==========================================
+// CART EVENT HANDLING
+// ==========================================
+
+$("cartList").addEventListener("click", event => {
+
+  const button = event.target.closest(
+    "button[data-action]"
+  );
+
+  if (!button) return;
+
+  const key = button.dataset.key;
+  const action = button.dataset.action;
+
+  if (action === "increase") {
+    changeCartQuantity(key, 1);
+  }
+
+  if (action === "decrease") {
+    changeCartQuantity(key, -1);
+  }
+});
+
+$("cartName").addEventListener("input", () => {
+
+  cartName = $("cartName").value;
+
+  saveCart();
+});
+
+$("clearCartBtn").addEventListener(
+  "click",
+  clearEntireCart
+);
+
+$("addToCartBtn").addEventListener(
+  "click",
+  addSelectedProductToCart
+);
 
 // ==========================================
 // TEXT NORMALIZATION
@@ -608,7 +1273,7 @@ function levenshtein(a, b) {
 }
 
 // ==========================================
-// IMPROVED TOKEN SIMILARITY
+// TOKEN SIMILARITY
 // ==========================================
 
 function tokenSimilarity(a, b) {
@@ -648,7 +1313,7 @@ function tokenSimilarity(a, b) {
 }
 
 // ==========================================
-// IMPROVED PRODUCT SCORING
+// PRODUCT SCORING
 // ==========================================
 
 function scoreMatch(ocrText, productName) {
@@ -781,7 +1446,7 @@ function escapeHtml(value) {
 function selectProduct(item, automatic = false) {
 
   // Automatic selection cannot replace an existing selection.
-  // Manual selection is always allowed to override it.
+  // Manual selection can always override it.
   if (finalSelectionMade && automatic) return;
 
   clearAutoFinalizeTimer();
@@ -790,6 +1455,8 @@ function selectProduct(item, automatic = false) {
   finalSelectionMade = true;
 
   const p = item.product;
+
+  selectedProduct = p;
 
   $("productName").textContent =
     p.name || "Product";
@@ -806,8 +1473,6 @@ function selectProduct(item, automatic = false) {
     Math.round(item.score * 100) +
     "%";
 
-  // Keep alternatives visible after automatic selection
-  // so the user can override it with another product.
   if (automatic) {
     $("choices").classList.remove("hidden");
   } else {
@@ -819,6 +1484,11 @@ function selectProduct(item, automatic = false) {
     : "✓ Your selection: " + p.name;
 
   $("selectionNote").classList.remove("hidden");
+
+  $("addToCartBtn").classList.remove("hidden");
+
+  $("addToCartBtn").textContent =
+    "Add to cart";
 
   $("scanAgainBtn").classList.remove("hidden");
 
@@ -843,6 +1513,12 @@ function displayMatches(matches) {
   const box = $("choices");
 
   box.innerHTML = "";
+
+  selectedProduct = null;
+
+  $("addToCartBtn").classList.add("hidden");
+
+  $("selectionNote").classList.add("hidden");
 
   if (
     !matches.length ||
@@ -879,7 +1555,6 @@ function displayMatches(matches) {
 
   const top = matches[0];
 
-  // Create all alternative product choices.
   matches.forEach((item, index) => {
 
     const button = document.createElement("button");
@@ -899,7 +1574,6 @@ function displayMatches(matches) {
       "</span>";
 
     button.addEventListener("click", () => {
-      // Manual selection works even when score is below 62%.
       selectProduct(item, false);
     });
 
@@ -910,14 +1584,8 @@ function displayMatches(matches) {
 
   $("scanAgainBtn").classList.add("hidden");
 
-  // ========================================
-  // NEW AUTOMATIC SELECTION RULE
-  // ========================================
-
-  // No margin requirement.
-  // No matched-token requirement.
-  // No coverage requirement.
-  // If the top score is at least 62%, select it.
+  // Automatic selection at 62% or higher.
+  // Manual selection is not restricted by this threshold.
 
   if (top.score >= AUTO_MATCH_THRESHOLD) {
 
@@ -997,7 +1665,7 @@ function getPortraitCrop() {
 }
 
 // ==========================================
-// CREATE HIGH-RESOLUTION OCR IMAGE
+// HIGH-RESOLUTION OCR IMAGE
 // ==========================================
 
 function createHighResolutionImage(crop) {
@@ -1046,7 +1714,7 @@ function createHighResolutionImage(crop) {
 }
 
 // ==========================================
-// CREATE GRAYSCALE / CONTRAST IMAGE
+// GRAYSCALE / CONTRAST IMAGE
 // ==========================================
 
 function createGrayscaleImage(source) {
@@ -1099,7 +1767,7 @@ function createGrayscaleImage(source) {
 }
 
 // ==========================================
-// OTSU THRESHOLD CALCULATION
+// OTSU THRESHOLD
 // ==========================================
 
 function calculateOtsuThreshold(grayData) {
@@ -1160,7 +1828,7 @@ function calculateOtsuThreshold(grayData) {
 }
 
 // ==========================================
-// CREATE BLACK AND WHITE IMAGE
+// BLACK AND WHITE IMAGE
 // ==========================================
 
 function createBinaryImage(source) {
@@ -1761,6 +2429,7 @@ $("scanAgainBtn").addEventListener(
 // INITIALIZATION
 // ==========================================
 
+loadCartFromStorage();
 loadProducts();
 
 })();
