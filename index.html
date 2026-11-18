@@ -4,9 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123b2a">
-  <meta name="description" content="Camera-based product information scanner">
+  <meta name="description" content="Fast camera-based product information scanner using RapidOCR & RapidFuzz">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>Product Scanner</title>
+  <title>Product Scanner - Fast OCR</title>
+  <!-- Load RapidOCR ONNX runtime and RapidFuzz browser builds -->
+  <script src="https://cdn.jsdelivr.net/npm/@rapidocr/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/rapidocr-web@1.0.0/dist/rapidocr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/rapidfuzz@3.9.0/dist/rapidfuzz.umd.min.js"></script>
   <style>
     :root { color-scheme:dark; --bg:#08130e; --panel:#11251a; --green:#70d69b; --muted:#a8b9ae; --line:#294536; }
     * { box-sizing:border-box }
@@ -45,14 +49,14 @@
 </head>
 <body>
 <header>
-  <div><h1>Product Scanner</h1><div class="sub">Smart photo capture · Top 5 product matches</div></div>
+  <div><h1>Product Scanner</h1><div class="sub">Fast mobile OCR · RapidOCR + Fuzzy Match</div></div>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
 <main>
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
     <div class="scan-frame"></div>
-    <div class="scan-hint">Keep the product name inside this short horizontal frame</div>
+    <div class="scan-hint">Keep the product name inside this horizontal frame</div>
   </section>
   <div class="controls">
     <button class="primary" id="startBtn">Start camera</button>
@@ -74,22 +78,19 @@
     <div class="choices hidden" id="choices"></div>
     <div class="match-meta hidden" id="selectionNote"></div>
   </section>
-  <p class="foot">Automatic photo capture starts when the camera view is steady. You can also tap Capture now. The scanner ranks up to five products by matching readable words anywhere in the full database product name, even when the brand name is not visible. The short horizontal capture frame focuses on the product-name area. Percentages are text-match scores, not guaranteed probabilities. The highest strong match is auto-confirmed after a short choice window. Tap another match first to override it.</p>
+  <p class="foot">Fast mobile OCR engine powered by RapidOCR and fuzzy string lookup. Keeps scanning smooth and instantly matches names against your full Excel/Cloud inventory.</p>
 </main>
 <canvas id="canvas" class="hidden"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (() => {
   "use strict";
   const API_URL = "https://vestige-products-api.vinaykinnera3301.workers.dev/";
   const $ = id => document.getElementById(id);
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
-  let products = [], stream = null, worker = null, scanTimer = null;
+  let products = [], productNamesList = [], stream = null, ocrEngine = null, scanTimer = null;
   let busy = false, lastFrameSample = null, stableFrames = 0, motionDetected = false;
-  let finalSelectionMade = false, currentMatches = [], autoFinalizeTimer = null;
-  const AUTO_FINALIZE_DELAY_MS = 4000;
-  const AUTO_FINALIZE_MIN_SCORE = 0.62;
-  const AUTO_FINALIZE_MIN_WORDS = 2;
+  let finalSelectionMade = false, autoFinalizeTimer = null;
+  const AUTO_FINALIZE_DELAY_MS = 3000;
 
   function setStatus(message) { $("status").textContent = message; }
   function clearAutoFinalizeTimer() {
@@ -100,10 +101,11 @@
     clearAutoFinalizeTimer();
     $("productName").textContent = "Point the camera at a product";
     $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
-    $("matchMeta").textContent = "The top five product matches will appear after capture.";
+    $("matchMeta").textContent = "The top product matches will appear after capture.";
     $("choices").innerHTML = ""; $("choices").classList.add("hidden");
     $("selectionNote").textContent = ""; $("selectionNote").classList.add("hidden");
   }
+
   async function loadProducts() {
     $("apiBadge").textContent = "Connecting…";
     try {
@@ -112,6 +114,7 @@
       const data = await response.json();
       if (!data || data.success !== true || !Array.isArray(data.products)) throw new Error(data?.error || "Invalid product API response.");
       products = data.products.filter(p => p && String(p.name || "").trim());
+      productNamesList = products.map(p => p.name);
       if (!products.length) throw new Error("The product database is empty.");
       $("apiBadge").textContent = products.length + " products loaded";
       $("apiBadge").style.borderColor = "#386449";
@@ -125,117 +128,93 @@
       return false;
     }
   }
-  function normalize(s) {
-    return String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-  }
-  const STOP_WORDS = new Set(["the", "and", "with", "for", "from", "new", "pack", "each", "use", "ml", "gm"]);
-  function tokens(s) { return normalize(s).split(" ").filter(x => x.length > 1 && !STOP_WORDS.has(x)); }
-  function wordSimilarity(a, b) {
-    if (a === b) return 1;
-    if (Math.abs(a.length - b.length) > 2 || Math.min(a.length, b.length) < 4) return 0;
-    const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-    for (let i = 1; i <= a.length; i++) {
-      let diagonal = prev[0]; prev[0] = i;
-      for (let j = 1; j <= b.length; j++) {
-        const above = prev[j];
-        prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
-        diagonal = above;
-      }
-    }
-    const distance = prev[b.length], allowed = Math.max(a.length, b.length) >= 9 ? 2 : 1;
-    return distance <= allowed ? 1 - distance / Math.max(a.length, b.length) : 0;
-  }
-  function similarity(ocr, name) {
-    // Match OCR words against EVERY word in the full database name. The brand
-    // may be missing from the photo, and the readable product words may occur
-    // anywhere in the database name (for example "Aloe Vera Gel" matches
-    // "Vestige Aloe Vera Gel"). Score the words actually read, not the brand
-    // and other database words that were outside the camera frame.
-    const heard = [...new Set(tokens(ocr))], wanted = [...new Set(tokens(name))];
-    if (!heard.length || !wanted.length) return { score: 0, matched: 0 };
-    let totalWeight = 0, matchedWeight = 0, matched = 0;
-    for (const seen of heard) {
-      const weight = Math.min(2.2, 0.7 + seen.length / 5);
-      totalWeight += weight;
-      let best = 0;
-      for (const word of wanted) best = Math.max(best, wordSimilarity(seen, word));
-      if (best >= 0.78) { matched++; matchedWeight += weight * best; }
-    }
-    return { score: matchedWeight / totalWeight, matched };
-  }
-  function findMatches(text, secondaryText = "") {
-    return products.map(product => {
-      const primary = similarity(text, product.name);
-      // Main product-name text drives the score; remaining package text only
-      // contributes a small tie-breaker for similar variants.
-      const secondary = secondaryText && secondaryText !== text ? similarity(secondaryText, product.name) : null;
-      const score = secondary ? (primary.score * 0.85 + secondary.score * 0.15) : primary.score;
-      return { product, score, matched: primary.matched };
-    }).sort((a, b) => b.score - a.score || b.matched - a.matched).slice(0, 5);
-  }
+
   function formatMoney(value) {
     if (value === null || value === undefined || value === "") return "—";
     const n = Number(String(value).replace(/,/g, ""));
     return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(value);
   }
+
+  function findMatches(ocrText) {
+    if (!ocrText || !products.length) return [];
+    
+    // Use RapidFuzz WRatio for robust token/string matching against the product list
+    const results = rapidfuzz.process.extract(
+      ocrText, 
+      productNamesList, 
+      { scorer: rapidfuzz.fuzz.WRatio, limit: 5 }
+    );
+
+    return results.map(([matchedName, score, index]) => ({
+      product: products[index],
+      score: score / 100.0, // Normalize to 0-1 range
+      matchedName
+    }));
+  }
+
   function selectProduct(item, automatic = false) {
     if (finalSelectionMade) return;
     clearAutoFinalizeTimer();
     finalSelectionMade = true;
-    stopAutoCapture();
+    if (scanTimer) clearInterval(scanTimer);
     const p = item.product;
     $("productName").textContent = p.name || "Product";
     $("mrp").textContent = formatMoney(p.MRP);
     $("dp").textContent = formatMoney(p.DP);
     $("pv").textContent = p.pv ?? "—";
-    $("matchMeta").textContent = (automatic ? "Automatically confirmed highest match" : "Your selected product") + " · Name match score: " + Math.round(item.score * 100) + "%";
+    $("matchMeta").textContent = (automatic ? "Automatically confirmed match" : "Selected product") + " · Match score: " + Math.round(item.score * 100) + "%";
     $("choices").classList.add("hidden");
-    $("selectionNote").textContent = automatic ? "✓ Highest-scoring strong match confirmed automatically. This product is now final." : "✓ Your choice is confirmed. This product is now final and will not be replaced automatically.";
+    $("selectionNote").textContent = "✓ Confirmed: " + p.name;
     $("selectionNote").classList.remove("hidden");
     $("scanAgainBtn").classList.remove("hidden");
     $("captureBtn").disabled = true;
-    setStatus("Selected and confirmed: " + p.name);
+    setStatus("Selected: " + p.name);
   }
+
   function displayMatches(matches) {
     clearAutoFinalizeTimer();
-    currentMatches = matches;
     const box = $("choices"); box.innerHTML = "";
-    if (!matches.length || matches[0].score <= 0) {
+    if (!matches.length || matches[0].score < 0.35) {
       $("productName").textContent = "No clear product match";
-      $("matchMeta").textContent = "The product name could not be read clearly. Try another photo with better light.";
-      box.classList.add("hidden"); setStatus("No useful name match. Please capture again.");
+      $("matchMeta").textContent = "Product text was unclear. Try better lighting.";
+      box.classList.add("hidden"); setStatus("No useful match found. Tap capture again.");
       $("scanAgainBtn").classList.remove("hidden"); return;
     }
-    $("productName").textContent = "Checking the highest product match…";
+    
+    $("productName").textContent = "Checking top product match…";
     $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
+    
     const top = matches[0];
-    const canAutoFinalize = top.score >= AUTO_FINALIZE_MIN_SCORE && top.matched >= AUTO_FINALIZE_MIN_WORDS;
+    const canAutoFinalize = top.score >= 0.70;
+    
     $("matchMeta").textContent = canAutoFinalize
-      ? "Top " + matches.length + " matches. Highest match will be confirmed in 4 seconds unless you select another product first."
-      : "Top " + matches.length + " matches. No result is strong enough for automatic confirmation; please select the correct product.";
+      ? "Top match confirmed automatically in 3 seconds. Tap another to override."
+      : "Please select the correct product match below.";
+
     matches.forEach((item, index) => {
       const button = document.createElement("button");
       button.className = "choice";
-      button.innerHTML = "<strong>" + (index + 1) + ". " + escapeHtml(item.product.name) + "</strong><br><span style=\"color:#bce9cc;font-size:12px\">Name match score: " + Math.round(item.score * 100) + "% · " + item.matched + " words matched" + (index === 0 && canAutoFinalize ? " · highest score" : "") + "</span>";
-      // A tap before the timer expires overrides the automatic top-score choice.
+      button.innerHTML = "<strong>" + (index + 1) + ". " + escapeHtml(item.product.name) + "</strong><br><span style=\"color:#bce9cc;font-size:12px\">Match score: " + Math.round(item.score * 100) + "%</span>";
       button.addEventListener("click", () => selectProduct(item, false));
       box.appendChild(button);
     });
     box.classList.remove("hidden");
     $("scanAgainBtn").classList.add("hidden");
+
     if (canAutoFinalize) {
-      let secondsLeft = Math.ceil(AUTO_FINALIZE_DELAY_MS / 1000);
-      setStatus("Highest match: " + Math.round(top.score * 100) + "%. Tap a different product within " + secondsLeft + " seconds to override.");
+      setStatus("Top match: " + Math.round(top.score * 100) + "%. Confirming automatically…");
       autoFinalizeTimer = setTimeout(() => {
         if (!finalSelectionMade) selectProduct(top, true);
       }, AUTO_FINALIZE_DELAY_MS);
     } else {
-      setStatus("Select the correct product from the top matches. Automatic confirmation is disabled for weak matches.");
+      setStatus("Select the correct product from the options.");
     }
   }
+
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
   }
+
   function getPortraitCrop() {
     const vw = video.videoWidth, vh = video.videoHeight, rect = video.getBoundingClientRect();
     const scale = Math.max(rect.width / vw, rect.height / vh);
@@ -244,6 +223,7 @@
     const cropW = visibleW * 0.88, cropH = visibleH * 0.36;
     return { sx: Math.max(0, offsetX + (visibleW - cropW) / 2), sy: Math.max(0, offsetY + (visibleH - cropH) / 2), sw: Math.min(cropW, vw), sh: Math.min(cropH, vh) };
   }
+
   function frameIsStable() {
     const sample = document.createElement("canvas"); sample.width = 32; sample.height = 40;
     const sctx = sample.getContext("2d", { willReadFrequently: true });
@@ -256,119 +236,98 @@
     diff /= gray.length; lastFrameSample = gray;
     return diff < 24;
   }
-  function getNameFirstText(data) {
-    const lines = Array.isArray(data.lines) ? data.lines : [];
-    return lines.map(line => {
-      const b = line.bbox || {}, h = Math.max(0, (b.y1 || 0) - (b.y0 || 0));
-      const text = String(line.text || "").trim(), letters = (text.match(/[A-Za-z]/g) || []).length;
-      return { text, weight: h * Math.min(letters, 24), letters };
-    }).filter(x => x.text && x.letters >= 3).sort((a, b) => b.weight - a.weight).slice(0, 6).map(x => x.text).join(" ");
-  }
-  function stopAutoCapture() {
-    if (scanTimer) clearInterval(scanTimer); scanTimer = null;
-  }
+
   async function captureAndRecognize(manual = false) {
     if (busy || !stream || finalSelectionMade || video.readyState < 2) return;
-    busy = true; stopAutoCapture(); $("captureBtn").disabled = true;
-    setStatus(manual ? "Capturing photo…" : "Product steady. Capturing photo…");
+    busy = true; 
+    if (scanTimer) clearInterval(scanTimer);
+    $("captureBtn").disabled = true;
+    setStatus(manual ? "Capturing photo…" : "Steady frame detected. Scanning…");
+
     try {
       const crop = getPortraitCrop();
-      const scale = Math.min(1, 1300 / Math.max(crop.sw, crop.sh));
-      canvas.width = Math.max(1, Math.round(crop.sw * scale)); canvas.height = Math.max(1, Math.round(crop.sh * scale));
-      ctx.filter = "none";
+      // Downscale long edge to max 640px for ultra-fast OCR execution
+      const scale = Math.min(1, 640 / Math.max(crop.sw, crop.sh));
+      canvas.width = Math.max(1, Math.round(crop.sw * scale)); 
+      canvas.height = Math.max(1, Math.round(crop.sh * scale));
+      
       ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
-      const result = await worker.recognize(canvas);
-      const data = result.data || {}, mainText = getNameFirstText(data), allText = String(data.text || "");
-      let matches = findMatches(mainText || allText, mainText ? allText : "");
-      if ((!matches[0] || matches[0].score < .45 || matches[0].matched < 2) && allText && allText !== mainText) {
-        const full = findMatches(allText);
-        if (full[0] && (!matches[0] || full[0].score > matches[0].score + .03)) matches = full;
-      }
-      if (!matches[0] || matches[0].score <= 0) {
-        ctx.filter = "grayscale(1) contrast(1.3) brightness(1.08)";
-        ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
-        const retry = await worker.recognize(canvas); ctx.filter = "none";
-        const retryData = retry.data || {}, retryText = getNameFirstText(retryData) || String(retryData.text || "");
-        const retryMatches = findMatches(retryText, retryText ? String(retryData.text || "") : "");
-        if (retryMatches[0] && retryMatches[0].score > (matches[0]?.score || 0)) matches = retryMatches;
-      }
+      
+      // Run RapidOCR
+      const res = await ocrEngine.run(canvas);
+      const recognizedText = res && res.text ? res.text : (Array.isArray(res) ? res.map(r => r.text).join(" ") : "");
+      
+      const matches = findMatches(recognizedText);
       displayMatches(matches);
     } catch (error) {
-      setStatus("Photo recognition issue: " + (error?.message || String(error)) + ". Tap Capture now to retry.");
+      setStatus("Recognition error: " + (error?.message || String(error)));
       $("scanAgainBtn").classList.remove("hidden");
     } finally {
       busy = false;
       if (stream && !finalSelectionMade) $("captureBtn").disabled = false;
     }
   }
+
   function monitorSteadiness() {
     if (busy || !stream || finalSelectionMade || video.readyState < 2) return;
     const stable = frameIsStable();
     if (stable === false) { motionDetected = true; stableFrames = 0; }
     else if (stable === true && motionDetected) stableFrames++;
     else stableFrames = 0;
-    if (stableFrames >= 4) { stableFrames = 0; motionDetected = false; captureAndRecognize(false); }
-    else if (motionDetected) setStatus("Movement detected. Hold the product steady for automatic capture.");
-    else setStatus("Move the product into the frame, then hold steady, or tap Capture now.");
+    if (stableFrames >= 3) { stableFrames = 0; motionDetected = false; captureAndRecognize(false); }
   }
+
   async function startCamera() {
     try {
       if (!products.length && !(await loadProducts())) return;
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable. Open the scanner over HTTPS.");
-      setStatus("Requesting camera permission…");
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access unavailable over non-HTTPS.");
+      setStatus("Starting camera & OCR model…");
+      
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
       video.srcObject = stream; await video.play();
+      
       $("startBtn").disabled = true; $("stopBtn").disabled = false; $("captureBtn").disabled = false;
-      setStatus("Loading text recognition… the first start may take a little time.");
-      if (!worker) {
-        worker = await Tesseract.createWorker("eng");
-        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+
+      if (!ocrEngine) {
+        ocrEngine = await new RapidOCR();
       }
-      try {
-        const track = stream.getVideoTracks()[0], caps = track.getCapabilities ? track.getCapabilities() : {};
-        if (caps.focusMode?.includes("continuous")) await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-      } catch (e) { console.debug("Continuous autofocus unavailable:", e); }
+
       clearAutoFinalizeTimer();
       lastFrameSample = null; stableFrames = 0; motionDetected = false; finalSelectionMade = false;
-      setStatus("Camera ready. Hold the product steady for automatic photo capture, or tap Capture now.");
-      scanTimer = setInterval(monitorSteadiness, 350);
+      setStatus("Camera ready. Hold product steady or tap Capture now.");
+      scanTimer = setInterval(monitorSteadinee, 300);
     } catch (error) {
-      setStatus("Could not start camera: " + (error?.message || String(error)) + ". Allow camera access and use HTTPS.");
+      setStatus("Camera error: " + (error?.message || String(error)));
       stopCamera(false);
     }
   }
+  
+  function monitorSteadinee() { monitorSteadiness(); }
+
   function stopCamera(updateStatus = true) {
-    stopAutoCapture();
+    if (scanTimer) clearInterval(scanTimer); scanTimer = null;
     if (stream) stream.getTracks().forEach(track => track.stop());
-    stream = null; video.srcObject = null; lastFrameSample = null; stableFrames = 0; motionDetected = false;
+    stream = null; video.srcObject = null; lastFrameSample = null;
     $("startBtn").disabled = false; $("stopBtn").disabled = true; $("captureBtn").disabled = true;
     if (updateStatus) setStatus("Camera stopped.");
   }
+
   function scanAnotherProduct() {
     clearAutoFinalizeTimer();
     finalSelectionMade = false; clearProductDisplay();
     $("scanAgainBtn").classList.add("hidden");
     if (stream) {
       lastFrameSample = null; stableFrames = 0; motionDetected = false; $("captureBtn").disabled = false;
-      setStatus("Ready for the next product. Hold it steady or tap Capture now.");
-      scanTimer = setInterval(monitorSteadiness, 350);
-    } else setStatus("Start the camera to scan another product.");
+      setStatus("Ready for next product.");
+      scanTimer = setInterval(monitorSteadinee, 300);
+    } else setStatus("Start camera to scan.");
   }
+
   $("startBtn").addEventListener("click", startCamera);
   $("stopBtn").addEventListener("click", () => stopCamera());
   $("captureBtn").addEventListener("click", () => captureAndRecognize(true));
   $("scanAgainBtn").addEventListener("click", scanAnotherProduct);
-  video.addEventListener("click", async () => {
-    if (!stream) return;
-    try {
-      const track = stream.getVideoTracks()[0], caps = track.getCapabilities ? track.getCapabilities() : {};
-      if (caps.focusMode?.includes("single-shot")) await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
-      setStatus("Tap to focus requested where supported. Keep the product steady.");
-    } catch (e) { console.debug("Tap focus unavailable:", e); }
-  });
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(error => console.warn("Service worker registration failed:", error)));
-  }
+
   loadProducts();
 })();
 </script>
