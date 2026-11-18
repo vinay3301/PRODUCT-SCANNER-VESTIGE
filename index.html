@@ -74,7 +74,7 @@
     <div class="choices hidden" id="choices"></div>
     <div class="match-meta hidden" id="selectionNote"></div>
   </section>
-  <p class="foot">Automatic photo capture starts when the camera view is steady. You can also tap Capture now. The scanner ranks up to five products using the main product name first. Percentages are text-match scores, not guaranteed probabilities. Your selected product is final and will not be changed automatically.</p>
+  <p class="foot">Automatic photo capture starts when the camera view is steady. You can also tap Capture now. The scanner ranks up to five products using the main product name first. Percentages are text-match scores, not guaranteed probabilities. The highest strong match is auto-confirmed after a short choice window. Tap another match first to override it.</p>
 </main>
 <canvas id="canvas" class="hidden"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -86,10 +86,18 @@
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
   let products = [], stream = null, worker = null, scanTimer = null;
   let busy = false, lastFrameSample = null, stableFrames = 0, motionDetected = false;
-  let finalSelectionMade = false, currentMatches = [];
+  let finalSelectionMade = false, currentMatches = [], autoFinalizeTimer = null;
+  const AUTO_FINALIZE_DELAY_MS = 4000;
+  const AUTO_FINALIZE_MIN_SCORE = 0.62;
+  const AUTO_FINALIZE_MIN_WORDS = 2;
 
   function setStatus(message) { $("status").textContent = message; }
+  function clearAutoFinalizeTimer() {
+    if (autoFinalizeTimer) clearTimeout(autoFinalizeTimer);
+    autoFinalizeTimer = null;
+  }
   function clearProductDisplay() {
+    clearAutoFinalizeTimer();
     $("productName").textContent = "Point the camera at a product";
     $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
     $("matchMeta").textContent = "The top five product matches will appear after capture.";
@@ -164,8 +172,9 @@
     const n = Number(String(value).replace(/,/g, ""));
     return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(value);
   }
-  function selectProduct(item) {
+  function selectProduct(item, automatic = false) {
     if (finalSelectionMade) return;
+    clearAutoFinalizeTimer();
     finalSelectionMade = true;
     stopAutoCapture();
     const p = item.product;
@@ -173,15 +182,16 @@
     $("mrp").textContent = formatMoney(p.MRP);
     $("dp").textContent = formatMoney(p.DP);
     $("pv").textContent = p.pv ?? "—";
-    $("matchMeta").textContent = "Your selected product · Name match score: " + Math.round(item.score * 100) + "%";
+    $("matchMeta").textContent = (automatic ? "Automatically confirmed highest match" : "Your selected product") + " · Name match score: " + Math.round(item.score * 100) + "%";
     $("choices").classList.add("hidden");
-    $("selectionNote").textContent = "✓ Selection confirmed. This product is final and will not be replaced by another scan.";
+    $("selectionNote").textContent = automatic ? "✓ Highest-scoring strong match confirmed automatically. This product is now final." : "✓ Your choice is confirmed. This product is now final and will not be replaced automatically.";
     $("selectionNote").classList.remove("hidden");
     $("scanAgainBtn").classList.remove("hidden");
     $("captureBtn").disabled = true;
     setStatus("Selected and confirmed: " + p.name);
   }
   function displayMatches(matches) {
+    clearAutoFinalizeTimer();
     currentMatches = matches;
     const box = $("choices"); box.innerHTML = "";
     if (!matches.length || matches[0].score <= 0) {
@@ -190,19 +200,32 @@
       box.classList.add("hidden"); setStatus("No useful name match. Please capture again.");
       $("scanAgainBtn").classList.remove("hidden"); return;
     }
-    $("productName").textContent = "Select the correct product";
+    $("productName").textContent = "Checking the highest product match…";
     $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
-    $("matchMeta").textContent = "Top " + matches.length + " matches, ranked by name-match score. Select the exact product; your choice will be final.";
+    const top = matches[0];
+    const canAutoFinalize = top.score >= AUTO_FINALIZE_MIN_SCORE && top.matched >= AUTO_FINALIZE_MIN_WORDS;
+    $("matchMeta").textContent = canAutoFinalize
+      ? "Top " + matches.length + " matches. Highest match will be confirmed in 4 seconds unless you select another product first."
+      : "Top " + matches.length + " matches. No result is strong enough for automatic confirmation; please select the correct product.";
     matches.forEach((item, index) => {
       const button = document.createElement("button");
       button.className = "choice";
-      button.innerHTML = "<strong>" + (index + 1) + ". " + escapeHtml(item.product.name) + "</strong><br><span style=\"color:#bce9cc;font-size:12px\">Name match score: " + Math.round(item.score * 100) + "% · " + item.matched + " words matched</span>";
-      button.addEventListener("click", () => selectProduct(item));
+      button.innerHTML = "<strong>" + (index + 1) + ". " + escapeHtml(item.product.name) + "</strong><br><span style=\"color:#bce9cc;font-size:12px\">Name match score: " + Math.round(item.score * 100) + "% · " + item.matched + " words matched" + (index === 0 && canAutoFinalize ? " · highest score" : "") + "</span>";
+      // A tap before the timer expires overrides the automatic top-score choice.
+      button.addEventListener("click", () => selectProduct(item, false));
       box.appendChild(button);
     });
     box.classList.remove("hidden");
     $("scanAgainBtn").classList.add("hidden");
-    setStatus("Choose the correct product from the top matches.");
+    if (canAutoFinalize) {
+      let secondsLeft = Math.ceil(AUTO_FINALIZE_DELAY_MS / 1000);
+      setStatus("Highest match: " + Math.round(top.score * 100) + "%. Tap a different product within " + secondsLeft + " seconds to override.");
+      autoFinalizeTimer = setTimeout(() => {
+        if (!finalSelectionMade) selectProduct(top, true);
+      }, AUTO_FINALIZE_DELAY_MS);
+    } else {
+      setStatus("Select the correct product from the top matches. Automatic confirmation is disabled for weak matches.");
+    }
   }
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -299,6 +322,7 @@
         const track = stream.getVideoTracks()[0], caps = track.getCapabilities ? track.getCapabilities() : {};
         if (caps.focusMode?.includes("continuous")) await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
       } catch (e) { console.debug("Continuous autofocus unavailable:", e); }
+      clearAutoFinalizeTimer();
       lastFrameSample = null; stableFrames = 0; motionDetected = false; finalSelectionMade = false;
       setStatus("Camera ready. Hold the product steady for automatic photo capture, or tap Capture now.");
       scanTimer = setInterval(monitorSteadiness, 350);
@@ -315,6 +339,7 @@
     if (updateStatus) setStatus("Camera stopped.");
   }
   function scanAnotherProduct() {
+    clearAutoFinalizeTimer();
     finalSelectionMade = false; clearProductDisplay();
     $("scanAgainBtn").classList.add("hidden");
     if (stream) {
