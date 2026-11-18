@@ -146,21 +146,43 @@ button:disabled {
 }
 
 .product-main-row {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:14px;
-  align-items:center;
+  display:block;
 }
 
 .product-details {
   min-width:0;
 }
 
+.product-title-row {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
 .product-name {
+  flex:1;
+  min-width:0;
   font-size:18px;
   font-weight:750;
-  line-height:1.25;
+  line-height:1.3;
   overflow-wrap:anywhere;
+}
+
+#addToCartBtn {
+  width:auto;
+  min-height:34px;
+  padding:7px 11px;
+  line-height:1.2;
+  font-size:12px;
+  border-radius:9px;
+  flex:none;
+  white-space:nowrap;
+}
+
+.add-button {
+  background:var(--green);
+  color:#062012;
 }
 
 .prices {
@@ -222,19 +244,6 @@ button:disabled {
 #selectionNote {
   color:#9be2b6;
   font-weight:650;
-}
-
-#addToCartBtn {
-  width:116px;
-  min-height:70px;
-  padding:12px;
-  line-height:1.4;
-  flex:none;
-}
-
-.add-button {
-  background:var(--green);
-  color:#062012;
 }
 
 #scanAgainBtn { width:100% }
@@ -330,30 +339,34 @@ button:disabled {
   margin-top:12px;
 }
 
+/* Compact horizontal cart row */
+
 .cart-item {
   background:#1a3324;
   border:1px solid var(--line);
   border-radius:13px;
   padding:11px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
   transition:opacity .2s ease, border-color .2s ease;
+  min-width:0;
 }
 
-/* Inactive products remain visible but faded */
+/* Quantity zero or below: keep visible but faded */
+
 .cart-item.inactive {
   opacity:.38;
   border-color:#26372c;
 }
 
-.cart-item-top {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
+.cart-item-info {
+  flex:1;
+  min-width:0;
 }
 
 .cart-item-name {
-  flex:1;
-  min-width:0;
   font-weight:700;
   font-size:14px;
   line-height:1.35;
@@ -372,7 +385,7 @@ button:disabled {
 .quantity-controls {
   display:flex;
   align-items:center;
-  gap:9px;
+  gap:7px;
   background:#0c2014;
   padding:4px;
   border-radius:10px;
@@ -393,7 +406,7 @@ button:disabled {
 }
 
 .quantity-value {
-  min-width:20px;
+  min-width:24px;
   text-align:center;
   font-size:15px;
   font-weight:800;
@@ -531,36 +544,35 @@ button:disabled {
 }
 
 @media (max-width:520px) {
-  .product-main-row {
-    grid-template-columns:minmax(0,1fr) 100px;
-    gap:8px;
-  }
-
-  #addToCartBtn {
-    width:100px;
-    min-height:64px;
-    font-size:12px;
-    padding:9px 6px;
-  }
-
   .prices { gap:6px }
   .price strong { font-size:17px }
 
-  .cart-item-top {
+  .cart-item {
     gap:8px;
+    padding:10px;
   }
 
   .cart-item-name {
     font-size:13px;
   }
 
+  .cart-item-prices {
+    gap:8px;
+    font-size:11px;
+  }
+
   .quantity-controls {
-    gap:6px;
+    gap:5px;
   }
 
   .quantity-btn {
-    width:30px;
+    width:29px;
     height:30px;
+  }
+
+  .quantity-value {
+    min-width:21px;
+    font-size:14px;
   }
 
   .cart-actions {
@@ -569,27 +581,36 @@ button:disabled {
 }
 
 @media (max-width:350px) {
-  .product-main-row {
-    grid-template-columns:1fr;
-  }
-
-  #addToCartBtn {
-    width:100%;
-    min-height:44px;
-  }
-
-  .cart-item-top {
+  .product-title-row {
     gap:6px;
   }
 
+  .product-name {
+    font-size:16px;
+  }
+
+  #addToCartBtn {
+    padding:7px 8px;
+    font-size:11px;
+  }
+
+  .cart-item {
+    gap:5px;
+    padding:8px;
+  }
+
   .quantity-controls {
-    gap:4px;
+    gap:3px;
     padding:3px;
   }
 
   .quantity-btn {
-    width:27px;
+    width:26px;
     height:28px;
+  }
+
+  .quantity-value {
+    min-width:18px;
   }
 
   .cart-actions {
@@ -643,8 +664,20 @@ button:disabled {
 
       <div class="product-details">
 
-        <div class="product-name" id="productName">
-          Point the camera at a product
+        <div class="product-title-row">
+
+          <div class="product-name" id="productName">
+            Point the camera at a product
+          </div>
+
+          <button
+            class="add-button hidden"
+            id="addToCartBtn"
+            type="button"
+          >
+            ＋ Add to Cart
+          </button>
+
         </div>
 
         <div class="prices">
@@ -665,15 +698,6 @@ button:disabled {
         </div>
 
       </div>
-
-      <button
-        class="add-button hidden"
-        id="addToCartBtn"
-        type="button"
-      >
-        <span style="font-size:20px">＋</span><br>
-        Add to Cart
-      </button>
 
     </div>
 
@@ -1260,6 +1284,8 @@ function addSelectedProductToCart() {
 
   if (existing) {
 
+    // If quantity was zero or negative, adding a product
+    // increases it by one instead of creating a duplicate.
     existing.quantity += 1;
 
   } else {
@@ -1311,7 +1337,11 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
-  // Keep the product in the cart even at zero or negative quantity.
+  // IMPORTANT:
+  // Never remove the item when quantity reaches zero.
+  // Zero and negative quantities remain in the cart,
+  // appear faded, and are excluded from totals.
+
   item.quantity += change;
 
   saveCartToStorage();
@@ -1419,6 +1449,9 @@ function loadSavedCart(id) {
     if (!confirmed) return;
   }
 
+  // Preserve zero and negative quantities.
+  // Do not filter them out or force them to 1.
+
   cart = saved.cart
     .map(normalizeCartItem)
     .filter(Boolean);
@@ -1459,7 +1492,7 @@ function renderSavedCarts() {
 
   savedCarts.forEach(saved => {
 
-    // Only positive quantities contribute to saved-cart totals.
+    // Only positive quantities contribute to totals.
     const activeItems = saved.cart.filter(item =>
       Number(item.quantity) > 0
     );
@@ -1534,7 +1567,7 @@ function renderCart() {
 
   list.innerHTML = "";
 
-  // Only products with quantity greater than zero are active.
+  // Only quantities greater than zero are active.
   const activeItems = cart.filter(item =>
     Number(item.quantity) > 0
   );
@@ -1553,7 +1586,7 @@ function renderCart() {
     const dp = numericValue(product.DP);
     const pv = numericValue(product.pv);
 
-    // Inactive items are excluded from all summary calculations.
+    // Only positive quantities contribute to totals.
     if (isActive) {
       totalQuantity += quantity;
       totalDP += dp * quantity;
@@ -1566,41 +1599,41 @@ function renderCart() {
       (isActive ? "" : " inactive");
 
     row.innerHTML = `
-      <div class="cart-item-top">
+      <div class="cart-item-info">
 
         <div class="cart-item-name">
           ${escapeHtml(product.name)}
         </div>
 
-        <div class="quantity-controls">
-
-          <button
-            type="button"
-            class="quantity-btn"
-            data-action="decrease"
-            data-key="${escapeHtml(item.key)}"
-            aria-label="Decrease quantity"
-          >−</button>
-
-          <span class="quantity-value">
-            ${quantity}
-          </span>
-
-          <button
-            type="button"
-            class="quantity-btn"
-            data-action="increase"
-            data-key="${escapeHtml(item.key)}"
-            aria-label="Increase quantity"
-          >+</button>
-
+        <div class="cart-item-prices">
+          <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
+          <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
         </div>
 
       </div>
 
-      <div class="cart-item-prices">
-        <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
-        <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
+      <div class="quantity-controls">
+
+        <button
+          type="button"
+          class="quantity-btn"
+          data-action="decrease"
+          data-key="${escapeHtml(item.key)}"
+          aria-label="Decrease quantity"
+        >−</button>
+
+        <span class="quantity-value">
+          ${quantity}
+        </span>
+
+        <button
+          type="button"
+          class="quantity-btn"
+          data-action="increase"
+          data-key="${escapeHtml(item.key)}"
+          aria-label="Increase quantity"
+        >+</button>
+
       </div>
     `;
 
@@ -1614,6 +1647,9 @@ function renderCart() {
     hasItems
   );
 
+  // Keep summary visible if cart contains rows,
+  // even if all quantities are zero or negative.
+
   $("cartSummary").classList.toggle(
     "hidden",
     !hasItems
@@ -1626,6 +1662,7 @@ function renderCart() {
 
   $("saveCartBtn").disabled = !hasItems;
 
+  // Cart badge shows only active quantity.
   $("cartCount").textContent =
     totalQuantity +
     (totalQuantity === 1 ? " item" : " items");
