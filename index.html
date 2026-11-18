@@ -247,7 +247,7 @@ button:disabled {
 <header>
   <div>
     <h1>Product Scanner</h1>
-    <div class="sub">Optimized Local Match Engine</div>
+    <div class="sub">Enhanced Multi-Pass OCR Match Engine</div>
   </div>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
@@ -285,7 +285,6 @@ button:disabled {
     </div>
 
     <div class="prices">
-
       <div class="price">
         <small>MRP</small>
         <strong id="mrp">—</strong>
@@ -300,7 +299,6 @@ button:disabled {
         <small>POINTS</small>
         <strong id="pv">—</strong>
       </div>
-
     </div>
 
     <div class="match-meta" id="matchMeta">
@@ -314,8 +312,8 @@ button:disabled {
   </section>
 
   <p class="foot">
-    Fast mobile scanner using Tesseract OCR, image downscaling,
-    intelligent fuzzy matching and your product database.
+    Enhanced camera scanner using multi-pass OCR, image processing,
+    high-resolution capture and intelligent product matching.
   </p>
 
 </main>
@@ -335,17 +333,30 @@ const API_URL =
 
 const AUTO_FINALIZE_DELAY_MS = 3000;
 
-const AUTO_MATCH_THRESHOLD = 0.72;
+const AUTO_MATCH_THRESHOLD = 0.76;
 
-const MIN_MATCH_THRESHOLD = 0.15;
+const MIN_MATCH_THRESHOLD = 0.20;
 
-const MIN_MATCH_MARGIN = 0.14;
+const MIN_MATCH_MARGIN = 0.12;
+
+// Maximum processing image dimension.
+// Higher resolution helps with small package lettering.
+const OCR_MAX_DIMENSION = 2000;
+
+// Upscaling factor for the camera crop.
+const OCR_UPSCALE_FACTOR = 1.7;
+
+// ==========================================
+// ELEMENTS
+// ==========================================
 
 const $ = id => document.getElementById(id);
 
 const video = $("video");
 const canvas = $("canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", {
+  willReadFrequently: true
+});
 
 // ==========================================
 // GLOBAL VARIABLES
@@ -556,7 +567,7 @@ function getTokens(str) {
 }
 
 // ==========================================
-// TOKEN SIMILARITY
+// LEVENSHTEIN DISTANCE
 // ==========================================
 
 function levenshtein(a, b) {
@@ -565,6 +576,11 @@ function levenshtein(a, b) {
 
   if (!a.length) return b.length;
   if (!b.length) return a.length;
+
+  // Avoid unnecessarily expensive comparisons.
+  if (Math.abs(a.length - b.length) > 5) {
+    return Math.max(a.length, b.length);
+  }
 
   let previous = Array.from(
     { length: b.length + 1 },
@@ -593,39 +609,56 @@ function levenshtein(a, b) {
   return previous[b.length];
 }
 
+// ==========================================
+// IMPROVED TOKEN SIMILARITY
+// ==========================================
+
 function tokenSimilarity(a, b) {
 
   if (a === b) return 1;
+
+  if (!a || !b) return 0;
 
   if (
     Math.min(a.length, b.length) >= 4 &&
     (a.includes(b) || b.includes(a))
   ) {
-    return 0.88;
+    const shorter = Math.min(a.length, b.length);
+    const longer = Math.max(a.length, b.length);
+
+    return 0.78 + (shorter / longer) * 0.17;
   }
 
   const maxLength = Math.max(a.length, b.length);
 
-  if (maxLength < 5) return 0;
+  if (maxLength < 4) return 0;
 
   const distance = levenshtein(a, b);
 
-  if (distance === 1) return 0.84;
+  const similarity =
+    1 - distance / maxLength;
 
-  if (distance === 2 && maxLength >= 8) {
-    return 0.72;
+  // Be stricter with short words.
+  if (maxLength <= 5 && distance > 1) {
+    return 0;
+  }
+
+  if (similarity >= 0.70) {
+    return similarity;
   }
 
   return 0;
 }
 
 // ==========================================
-// IMPROVED FUZZY MATCHING
+// IMPROVED PRODUCT SCORING
 // ==========================================
 
 function scoreMatch(ocrText, productName) {
 
-  const ocrTokens = getTokens(ocrText);
+  const ocrTokens = [
+    ...new Set(getTokens(ocrText))
+  ];
 
   const productTokens = [
     ...new Set(getTokens(productName))
@@ -637,13 +670,14 @@ function scoreMatch(ocrText, productName) {
   ) {
     return {
       score: 0,
-      matchedTokens: 0
+      matchedTokens: 0,
+      coverage: 0
     };
   }
 
   let totalScore = 0;
-  let matchedTokens = 0;
   let totalWeight = 0;
+  let matchedTokens = 0;
 
   for (const pt of productTokens) {
 
@@ -656,24 +690,37 @@ function scoreMatch(ocrText, productName) {
       if (similarity > bestSimilarity) {
         bestSimilarity = similarity;
       }
+
+      if (bestSimilarity >= 0.99) break;
     }
 
-    const weight = Math.min(pt.length, 10);
+    // Longer product words carry more importance.
+    const weight = Math.min(pt.length, 12);
 
     totalScore += bestSimilarity * weight;
     totalWeight += weight;
 
-    if (bestSimilarity >= 0.72) {
+    if (bestSimilarity >= 0.70) {
       matchedTokens++;
     }
   }
 
-  return {
-    score: totalWeight
-      ? totalScore / totalWeight
-      : 0,
+  const score = totalWeight
+    ? totalScore / totalWeight
+    : 0;
 
-    matchedTokens
+  const coverage =
+    matchedTokens / productTokens.length;
+
+  // Reward products where several separate words match.
+  const coverageBonus =
+    coverage >= 0.75 ? 0.06 :
+    coverage >= 0.50 ? 0.03 : 0;
+
+  return {
+    score: Math.min(1, score + coverageBonus),
+    matchedTokens,
+    coverage
   };
 }
 
@@ -697,11 +744,19 @@ function findMatches(ocrText) {
     return {
       product,
       score: result.score,
-      matchedTokens: result.matchedTokens
+      matchedTokens: result.matchedTokens,
+      coverage: result.coverage
     };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => {
+
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+
+    return b.coverage - a.coverage;
+  });
 
   return scored.slice(0, 5);
 }
@@ -793,7 +848,7 @@ function displayMatches(matches) {
     $("pv").textContent = "—";
 
     $("matchMeta").textContent =
-      "Product text was unclear. Try better lighting or move closer.";
+      "Product text was unclear. Try better lighting, move closer, or capture again.";
 
     box.classList.add("hidden");
 
@@ -824,11 +879,11 @@ function displayMatches(matches) {
     top.score >= AUTO_MATCH_THRESHOLD &&
     (
       margin >= MIN_MATCH_MARGIN ||
-      top.score >= 0.92
+      top.score >= 0.93
     ) &&
     (
       top.matchedTokens >= 2 ||
-      top.score >= 0.92
+      top.coverage >= 0.75
     );
 
   $("matchMeta").textContent = highConfidence
@@ -903,6 +958,7 @@ function getPortraitCrop() {
     throw new Error("Camera frame is not ready.");
   }
 
+  // Account for object-fit: cover.
   const scale = Math.max(
     rect.width / vw,
     rect.height / vh
@@ -931,6 +987,332 @@ function getPortraitCrop() {
     sw: Math.min(cropW, vw),
     sh: Math.min(cropH, vh)
   };
+}
+
+// ==========================================
+// CREATE HIGH-RESOLUTION OCR IMAGE
+// ==========================================
+
+function createHighResolutionImage(crop) {
+
+  const targetScale = Math.min(
+    OCR_UPSCALE_FACTOR,
+    OCR_MAX_DIMENSION /
+      Math.max(crop.sw, crop.sh)
+  );
+
+  const width = Math.max(
+    1,
+    Math.round(crop.sw * targetScale)
+  );
+
+  const height = Math.max(
+    1,
+    Math.round(crop.sh * targetScale)
+  );
+
+  const imageCanvas = document.createElement("canvas");
+
+  imageCanvas.width = width;
+  imageCanvas.height = height;
+
+  const imageCtx = imageCanvas.getContext("2d", {
+    willReadFrequently: true
+  });
+
+  // Better interpolation when enlarging small text.
+  imageCtx.imageSmoothingEnabled = true;
+  imageCtx.imageSmoothingQuality = "high";
+
+  imageCtx.drawImage(
+    video,
+    crop.sx,
+    crop.sy,
+    crop.sw,
+    crop.sh,
+    0,
+    0,
+    width,
+    height
+  );
+
+  return imageCanvas;
+}
+
+// ==========================================
+// CREATE GRAYSCALE / CONTRAST IMAGE
+// ==========================================
+
+function createGrayscaleImage(source) {
+
+  const output = document.createElement("canvas");
+
+  output.width = source.width;
+  output.height = source.height;
+
+  const octx = output.getContext("2d", {
+    willReadFrequently: true
+  });
+
+  octx.drawImage(source, 0, 0);
+
+  const image = octx.getImageData(
+    0,
+    0,
+    output.width,
+    output.height
+  );
+
+  const data = image.data;
+
+  // Contrast enhancement.
+  const contrast = 1.45;
+  const brightness = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+
+    let gray =
+      0.299 * data[i] +
+      0.587 * data[i + 1] +
+      0.114 * data[i + 2];
+
+    gray =
+      (gray - 128) * contrast +
+      128 +
+      brightness;
+
+    gray = Math.max(0, Math.min(255, gray));
+
+    data[i] = gray;
+    data[i + 1] = gray;
+    data[i + 2] = gray;
+  }
+
+  octx.putImageData(image, 0, 0);
+
+  return output;
+}
+
+// ==========================================
+// OTSU THRESHOLD CALCULATION
+// ==========================================
+
+function calculateOtsuThreshold(grayData) {
+
+  const histogram = new Array(256).fill(0);
+
+  let total = grayData.length;
+  let sum = 0;
+
+  for (let i = 0; i < total; i++) {
+
+    const value = grayData[i];
+
+    histogram[value]++;
+    sum += value;
+  }
+
+  let sumBackground = 0;
+  let weightBackground = 0;
+  let maximumVariance = 0;
+  let threshold = 127;
+
+  for (let t = 0; t < 256; t++) {
+
+    weightBackground += histogram[t];
+
+    if (!weightBackground) continue;
+
+    const weightForeground =
+      total - weightBackground;
+
+    if (!weightForeground) break;
+
+    sumBackground += t * histogram[t];
+
+    const meanBackground =
+      sumBackground / weightBackground;
+
+    const meanForeground =
+      (sum - sumBackground) / weightForeground;
+
+    const variance =
+      weightBackground *
+      weightForeground *
+      Math.pow(
+        meanBackground - meanForeground,
+        2
+      );
+
+    if (variance > maximumVariance) {
+
+      maximumVariance = variance;
+      threshold = t;
+    }
+  }
+
+  return threshold;
+}
+
+// ==========================================
+// CREATE BLACK AND WHITE IMAGE
+// ==========================================
+
+function createBinaryImage(source) {
+
+  const grayCanvas = createGrayscaleImage(source);
+
+  const output = document.createElement("canvas");
+
+  output.width = source.width;
+  output.height = source.height;
+
+  const octx = output.getContext("2d", {
+    willReadFrequently: true
+  });
+
+  const image = grayCanvas.getContext("2d", {
+    willReadFrequently: true
+  }).getImageData(
+    0,
+    0,
+    grayCanvas.width,
+    grayCanvas.height
+  );
+
+  const data = image.data;
+
+  const grayValues = new Uint8Array(
+    data.length / 4
+  );
+
+  for (
+    let i = 0, j = 0;
+    i < data.length;
+    i += 4, j++
+  ) {
+    grayValues[j] = data[i];
+  }
+
+  const threshold =
+    calculateOtsuThreshold(grayValues);
+
+  for (let i = 0; i < data.length; i += 4) {
+
+    const value =
+      data[i] >= threshold ? 255 : 0;
+
+    data[i] = value;
+    data[i + 1] = value;
+    data[i + 2] = value;
+    data[i + 3] = 255;
+  }
+
+  octx.putImageData(image, 0, 0);
+
+  return output;
+}
+
+// ==========================================
+// MULTI-PASS OCR
+// ==========================================
+
+async function runMultiPassOCR(sourceCanvas) {
+
+  if (!worker) {
+    throw new Error("OCR engine is not ready.");
+  }
+
+  const grayscaleCanvas =
+    createGrayscaleImage(sourceCanvas);
+
+  const binaryCanvas =
+    createBinaryImage(sourceCanvas);
+
+  const passes = [
+    {
+      image: sourceCanvas,
+      mode: "11",
+      label: "Detailed text detection"
+    },
+    {
+      image: grayscaleCanvas,
+      mode: "6",
+      label: "Grayscale text recognition"
+    },
+    {
+      image: binaryCanvas,
+      mode: "7",
+      label: "High-contrast text recognition"
+    }
+  ];
+
+  const results = [];
+
+  for (let i = 0; i < passes.length; i++) {
+
+    const pass = passes[i];
+
+    setStatus(
+      "Reading product text (" +
+      (i + 1) +
+      "/" +
+      passes.length +
+      "): " +
+      pass.label +
+      "…"
+    );
+
+    await worker.setParameters({
+
+      tessedit_pageseg_mode: pass.mode,
+
+      preserve_interword_spaces: "1",
+
+      user_defined_dpi: "300"
+    });
+
+    const result = await worker.recognize(pass.image);
+
+    const text = result?.data?.text || "";
+
+    if (text.trim()) {
+      results.push(text);
+    }
+  }
+
+  return results;
+}
+
+// ==========================================
+// COMBINE OCR RESULTS
+// ==========================================
+
+function combineOCRResults(results) {
+
+  const uniqueLines = new Map();
+
+  for (const result of results) {
+
+    const lines = String(result || "")
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 1);
+
+    for (const line of lines) {
+
+      const normalized = normalizeText(line);
+
+      if (!normalized) continue;
+
+      // Keep the first occurrence of each recognized line.
+      if (!uniqueLines.has(normalized)) {
+        uniqueLines.set(normalized, line);
+      }
+    }
+  }
+
+  return [...uniqueLines.values()].join(" ");
 }
 
 // ==========================================
@@ -1037,42 +1419,27 @@ async function captureAndRecognize(manual = false) {
 
   setStatus(
     manual
-      ? "Capturing photo…"
-      : "Steady frame detected. Scanning…"
+      ? "Capturing high-resolution image…"
+      : "Steady frame detected. Preparing image…"
   );
 
   try {
 
     const crop = getPortraitCrop();
 
-    const scale = Math.min(
-      1,
-      1000 / Math.max(crop.sw, crop.sh)
-    );
+    // Create a high-resolution image from the camera crop.
+    const sourceCanvas =
+      createHighResolutionImage(crop);
 
-    canvas.width = Math.max(
-      1,
-      Math.round(crop.sw * scale)
-    );
+    // Keep a copy in the existing hidden canvas.
+    canvas.width = sourceCanvas.width;
+    canvas.height = sourceCanvas.height;
 
-    canvas.height = Math.max(
-      1,
-      Math.round(crop.sh * scale)
-    );
+    ctx.drawImage(sourceCanvas, 0, 0);
 
-    ctx.drawImage(
-      video,
-      crop.sx,
-      crop.sy,
-      crop.sw,
-      crop.sh,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    const result = await worker.recognize(canvas);
+    // Run three different OCR passes.
+    const ocrResults =
+      await runMultiPassOCR(sourceCanvas);
 
     if (
       currentSession !== scanSession ||
@@ -1082,7 +1449,7 @@ async function captureAndRecognize(manual = false) {
     }
 
     const recognizedText =
-      result?.data?.text || "";
+      combineOCRResults(ocrResults);
 
     if (!recognizedText.trim()) {
 
@@ -1217,6 +1584,14 @@ async function startCamera() {
         video: {
           facingMode: {
             ideal: "environment"
+          },
+
+          width: {
+            ideal: 1920
+          },
+
+          height: {
+            ideal: 1080
           }
         },
 
@@ -1241,7 +1616,9 @@ async function startCamera() {
 
         tessedit_pageseg_mode: "11",
 
-        preserve_interword_spaces: "1"
+        preserve_interword_spaces: "1",
+
+        user_defined_dpi: "300"
       });
     }
 
