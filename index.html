@@ -79,49 +79,53 @@
   let products = [], stream = null, worker = null, scanTimer = null, busy = false;
   let lastCandidate = "", repeatCount = 0;
 
-  function setStatus(s) { $("status").textContent = s; }
-  function jsonp(url) {
-    return new Promise((resolve, reject) => {
-      const cb = "__productApiCallback_" + Math.random().toString(36).slice(2);
-      const script = document.createElement("script");
-      const timer = setTimeout(() => { cleanup(); reject(new Error("API timed out")); }, 15000);
-      function cleanup() { clearTimeout(timer); delete window[cb]; script.remove(); }
-      window[cb] = data => { cleanup(); resolve(data); };
-      script.onerror = () => { cleanup(); reject(new Error("Could not load product API. Check the Apps Script JSONP update in README.")); };
-      script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cb + "&_=" + Date.now();
-      document.head.appendChild(script);
-    });
-  }
+  function setStatus(message) { $("status").textContent = message; }
+
   async function loadProducts() {
+    $("apiBadge").textContent = "Connecting…";
     try {
-      const data = await jsonp(API_URL);
-      if (data && data.success === false) throw new Error(data.error || "API reported an error");
-      products = Array.isArray(data) ? data : (data.products || []);
-      if (!products.length) throw new Error("API returned no products. Check that the products sheet has rows.");
+      const response = await fetch(API_URL, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        headers: { "Accept": "application/json" }
+      });
+      if (!response.ok) throw new Error("API returned HTTP " + response.status);
+      const data = await response.json();
+      if (!data || data.success !== true || !Array.isArray(data.products)) {
+        throw new Error(data && data.error ? data.error : "Invalid API response: expected success and products.");
+      }
+      products = data.products.filter(p => p && String(p.name || "").trim());
+      if (!products.length) throw new Error("API connected, but the products list is empty. Check the published products tab.");
       $("apiBadge").textContent = products.length + " products loaded";
       $("apiBadge").style.borderColor = "#386449";
       setStatus("Product database ready. Start the camera to scan.");
-    } catch (e) {
+      return true;
+    } catch (error) {
+      products = [];
       $("apiBadge").textContent = "API not connected";
-      setStatus(e.message);
+      $("apiBadge").style.borderColor = "#a64b4b";
+      setStatus("Product API error: " + (error && error.message ? error.message : String(error)));
+      console.error("Product API connection failed:", error);
+      return false;
     }
   }
+
   function normalize(s) {
-    return String(s || "").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+    return String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
   }
-  const STOP_WORDS = new Set(["the","and","with","for","from","new","pack","each","use","ml","gm"]);
+  const STOP_WORDS = new Set(["the", "and", "with", "for", "from", "new", "pack", "each", "use", "ml", "gm"]);
   function tokens(s) {
     return normalize(s).split(" ").filter(x => x.length > 1 && !STOP_WORDS.has(x));
   }
-  // Compare complete words. A small edit-distance allowance corrects common OCR
-  // confusions such as SPIRUL1NA -> SPIRULINA without matching isolated letters.
+  // Compare complete words; tolerate a small number of common OCR character errors.
   function wordSimilarity(a, b) {
     if (a === b) return 1;
-    if (Math.abs(a.length - b.length) > 2) return 0;
-    if (Math.min(a.length, b.length) < 4) return 0;
-    const prev = Array.from({length:b.length + 1}, (_, i) => i);
+    if (Math.abs(a.length - b.length) > 2 || Math.min(a.length, b.length) < 4) return 0;
+    const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
     for (let i = 1; i <= a.length; i++) {
-      let diagonal = prev[0]; prev[0] = i;
+      let diagonal = prev[0];
+      prev[0] = i;
       for (let j = 1; j <= b.length; j++) {
         const above = prev[j];
         prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
@@ -135,11 +139,10 @@
   function similarity(ocr, name) {
     const heard = [...new Set(tokens(ocr))];
     const wanted = [...new Set(tokens(name))];
-    if (!heard.length || !wanted.length) return {score:0, matched:0, words:[]};
+    if (!heard.length || !wanted.length) return { score: 0, matched: 0, words: [] };
     let totalWeight = 0, matchedWeight = 0, matched = 0;
     const matchedWords = [];
     for (const word of wanted) {
-      // Longer, distinctive product words contribute more than generic short words.
       const weight = Math.min(2.2, 0.7 + word.length / 5);
       totalWeight += weight;
       let best = 0;
@@ -150,111 +153,123 @@
         matchedWords.push(word);
       }
     }
-    const coverage = matchedWeight / totalWeight;
-    return {score:coverage, matched, words:matchedWords};
+    return { score: matchedWeight / totalWeight, matched, words: matchedWords };
   }
-  function formatMoney(v) {
-    if (v === null || v === undefined || v === "") return "—";
-    const n = Number(String(v).replace(/,/g,""));
-    return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN",{maximumFractionDigits:2}) : String(v);
+  function formatMoney(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(String(value).replace(/,/g, ""));
+    return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(value);
   }
-  function showProduct(p, score, uncertain=false) {
-    $("productName").textContent = p.name || "Product";
-    $("mrp").textContent = formatMoney(p.MRP);
-    $("dp").textContent = formatMoney(p.DP);
-    $("pv").textContent = p.pv ?? "—";
-    $("matchMeta").textContent = (uncertain ? "Possible match — please verify the product name and size. " : "Matched from packaging text. ") + "Match confidence: " + Math.round(score*100) + "%";
+  function showProduct(product, score, uncertain = false) {
+    $("productName").textContent = product.name || "Product";
+    $("mrp").textContent = formatMoney(product.MRP);
+    $("dp").textContent = formatMoney(product.DP);
+    $("pv").textContent = product.pv ?? "—";
+    $("matchMeta").textContent = (uncertain ? "Possible match — please verify the product name and size. " : "Matched from packaging text. ") + "Match confidence: " + Math.round(score * 100) + "%";
     $("choices").classList.add("hidden");
     $("choices").innerHTML = "";
   }
   function findMatches(text) {
-    return products.map(p => {
-      const result = similarity(text, p.name);
-      return {p, score:result.score, matched:result.matched, matchedWords:result.words};
-    }).sort((a,b)=>b.score-a.score);
+    return products.map(product => {
+      const result = similarity(text, product.name);
+      return { p: product, score: result.score, matched: result.matched, matchedWords: result.words };
+    }).sort((a, b) => b.score - a.score);
   }
   function displayMatches(matches) {
     const best = matches[0], second = matches[1];
-    if (!best || best.score < .42 || (best.matched < 2 && best.score < .78)) {
+    if (!best || best.score < 0.42 || (best.matched < 2 && best.score < 0.78)) {
       setStatus("Not enough matching product words yet. Show at least two clear words from the product name.");
       return;
     }
-    if (best.score < .68 || (second && best.score - second.score < .12)) {
+    if (best.score < 0.68 || (second && best.score - second.score < 0.12)) {
       $("productName").textContent = "More than one possible match";
       $("matchMeta").textContent = "Choose the correct product below. Similar product names are not selected automatically.";
-      const box = $("choices"); box.innerHTML = ""; box.classList.remove("hidden");
-      matches.slice(0,4).filter(x=>x.score>.3).forEach(x=>{
-        const b=document.createElement("button"); b.className="choice";
-        b.textContent=x.p.name+" · "+Math.round(x.score*100)+"%";
-        b.onclick=()=>showProduct(x.p,x.score,true); box.appendChild(b);
+      const box = $("choices");
+      box.innerHTML = "";
+      box.classList.remove("hidden");
+      matches.slice(0, 4).filter(item => item.score > 0.3).forEach(item => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.textContent = item.p.name + " · " + Math.round(item.score * 100) + "%";
+        button.onclick = () => showProduct(item.p, item.score, true);
+        box.appendChild(button);
       });
       setStatus("Please confirm which product you are scanning.");
       return;
     }
-    showProduct(best.p,best.score,false);
+    showProduct(best.p, best.score, false);
     setStatus("Product identified. Keep scanning or point at another product.");
   }
   async function scanFrame() {
     if (busy || !worker || !stream || video.readyState < 2) return;
     busy = true;
     try {
-      const w = video.videoWidth, h = video.videoHeight;
-      if (!w || !h) return;
-      // Keep the scan region centred and cap its width to reduce OCR workload.
-      const cropW = Math.round(w*.78), cropH = Math.round(h*.58);
-      const sx = Math.round((w-cropW)/2), sy = Math.round((h-cropH)/2);
+      const width = video.videoWidth, height = video.videoHeight;
+      if (!width || !height) return;
+      const cropW = Math.round(width * 0.78), cropH = Math.round(height * 0.58);
+      const sx = Math.round((width - cropW) / 2), sy = Math.round((height - cropH) / 2);
       const scale = Math.min(1, 1000 / cropW);
       canvas.width = Math.max(1, Math.round(cropW * scale));
       canvas.height = Math.max(1, Math.round(cropH * scale));
-      ctx.drawImage(video,sx,sy,cropW,cropH,0,0,canvas.width,canvas.height);
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
       const result = await worker.recognize(canvas);
-      const text = result.data.text || "";
-      const matches = findMatches(text);
+      const matches = findMatches(result.data.text || "");
       const best = matches[0];
-      if (best && best.score >= .42 && (best.matched >= 2 || best.score >= .78)) {
+      if (best && best.score >= 0.42 && (best.matched >= 2 || best.score >= 0.78)) {
         const key = normalize(best.p.name);
-        if (key === lastCandidate) repeatCount++; else { lastCandidate=key; repeatCount=1; }
+        if (key === lastCandidate) repeatCount++;
+        else { lastCandidate = key; repeatCount = 1; }
         if (repeatCount >= 2) displayMatches(matches);
         else setStatus("Reading label… hold steady for another moment.");
       } else {
-        lastCandidate=""; repeatCount=0;
+        lastCandidate = "";
+        repeatCount = 0;
         setStatus("Reading packaging… keep the product name inside the frame.");
       }
-    } catch (e) {
-      setStatus("Scanning issue: " + e.message);
-    } finally { busy=false; }
+    } catch (error) {
+      setStatus("Scanning issue: " + error.message);
+    } finally {
+      busy = false;
+    }
   }
   async function startCamera() {
     try {
-      if (!products.length) await loadProducts();
-      if (!products.length) return;
+      if (!products.length) {
+        const loaded = await loadProducts();
+        if (!loaded) return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access is unavailable. Open this scanner over HTTPS in a supported browser.");
+      }
       setStatus("Requesting camera permission…");
-      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
-      video.srcObject=stream;
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      video.srcObject = stream;
       await video.play();
-      $("startBtn").disabled=true; $("stopBtn").disabled=false;
+      $("startBtn").disabled = true;
+      $("stopBtn").disabled = false;
       setStatus("Loading text recognition… this may take a little time the first time.");
       if (!worker) worker = await Tesseract.createWorker("eng");
       setStatus("Camera ready. Checking for a new frame every 0.5 seconds; OCR runs sequentially.");
-      scanTimer=setInterval(scanFrame,500);
-    } catch (e) {
-      setStatus("Could not start camera: " + e.message + ". Open this app over HTTPS and allow camera access.");
-      stopCamera();
+      scanTimer = setInterval(scanFrame, 500);
+    } catch (error) {
+      setStatus("Could not start camera: " + error.message + ". Open this app over HTTPS and allow camera access.");
+      stopCamera(false);
     }
   }
-  function stopCamera() {
-    if (scanTimer) clearInterval(scanTimer); scanTimer=null;
-    if (stream) stream.getTracks().forEach(t=>t.stop()); stream=null;
-    video.srcObject=null;
-    $("startBtn").disabled=false; $("stopBtn").disabled=true;
-    // Keep the OCR worker warm when the user stops and restarts the camera.
-    // This avoids downloading/reinitialising the language model on every restart.
-    setStatus("Camera stopped. Text recognition remains ready for the next scan.");
+  function stopCamera(updateStatus = true) {
+    if (scanTimer) clearInterval(scanTimer);
+    scanTimer = null;
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    $("startBtn").disabled = false;
+    $("stopBtn").disabled = true;
+    if (updateStatus) setStatus("Camera stopped. Text recognition remains ready for the next scan.");
   }
-  $("startBtn").addEventListener("click",startCamera);
-  $("stopBtn").addEventListener("click",stopCamera);
+  $("startBtn").addEventListener("click", startCamera);
+  $("stopBtn").addEventListener("click", () => stopCamera());
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(error => console.warn("Service worker registration failed:", error)));
   }
   loadProducts();
 })();
