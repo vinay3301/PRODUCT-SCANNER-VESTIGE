@@ -7,7 +7,6 @@
 <meta name="theme-color" content="#123b2a">
 <meta name="description" content="Fast camera-based product information scanner">
 <link rel="manifest" href="manifest.webmanifest">
-
 <title>Product Scanner</title>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -327,52 +326,62 @@ button:disabled {
 .cart-list,
 .saved-list {
   display:grid;
-  gap:10px;
-  margin-top:14px;
+  gap:8px;
+  margin-top:12px;
 }
 
 .cart-item {
   background:#1a3324;
   border:1px solid var(--line);
   border-radius:13px;
-  padding:12px;
+  padding:11px 12px;
+  transition:opacity .2s ease, border-color .2s ease;
+}
+
+/* Inactive products remain visible but faded */
+.cart-item.inactive {
+  opacity:.38;
+  border-color:#26372c;
+}
+
+.cart-item-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
 }
 
 .cart-item-name {
+  flex:1;
+  min-width:0;
   font-weight:700;
   font-size:14px;
-  line-height:1.4;
+  line-height:1.35;
   overflow-wrap:anywhere;
 }
 
 .cart-item-prices {
   display:flex;
   flex-wrap:wrap;
-  gap:14px;
+  gap:12px;
   color:var(--muted);
   font-size:12px;
-  margin-top:8px;
-}
-
-.cart-item-bottom {
-  display:flex;
-  justify-content:flex-end;
-  align-items:center;
-  margin-top:12px;
+  margin-top:5px;
 }
 
 .quantity-controls {
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:9px;
   background:#0c2014;
-  padding:5px;
+  padding:4px;
   border-radius:10px;
+  flex:none;
 }
 
 .quantity-btn {
-  width:34px;
-  height:34px;
+  width:32px;
+  height:32px;
   padding:0;
   border-radius:8px;
   background:#294936;
@@ -384,10 +393,11 @@ button:disabled {
 }
 
 .quantity-value {
-  min-width:18px;
+  min-width:20px;
   text-align:center;
   font-size:15px;
   font-weight:800;
+  font-variant-numeric:tabular-nums;
 }
 
 .cart-summary {
@@ -430,9 +440,7 @@ button:disabled {
   font-size:19px;
 }
 
-/* =====================================
-   CART ACTION BUTTONS
-===================================== */
+/* CART ACTION BUTTONS */
 
 .cart-actions {
   display:grid;
@@ -459,9 +467,7 @@ button:disabled {
   border:1px solid #69413b;
 }
 
-/* =====================================
-   SAVED CARTS
-===================================== */
+/* SAVED CARTS */
 
 .saved-section {
   margin-top:16px;
@@ -540,7 +546,26 @@ button:disabled {
   .prices { gap:6px }
   .price strong { font-size:17px }
 
-  .cart-item-prices { gap:10px }
+  .cart-item-top {
+    gap:8px;
+  }
+
+  .cart-item-name {
+    font-size:13px;
+  }
+
+  .quantity-controls {
+    gap:6px;
+  }
+
+  .quantity-btn {
+    width:30px;
+    height:30px;
+  }
+
+  .cart-actions {
+    gap:8px;
+  }
 }
 
 @media (max-width:350px) {
@@ -551,6 +576,20 @@ button:disabled {
   #addToCartBtn {
     width:100%;
     min-height:44px;
+  }
+
+  .cart-item-top {
+    gap:6px;
+  }
+
+  .quantity-controls {
+    gap:4px;
+    padding:3px;
+  }
+
+  .quantity-btn {
+    width:27px;
+    height:28px;
   }
 
   .cart-actions {
@@ -571,8 +610,6 @@ button:disabled {
 </header>
 
 <main>
-
-  <!-- SCANNER -->
 
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
@@ -629,8 +666,6 @@ button:disabled {
 
       </div>
 
-      <!-- ADD TO CART BESIDE PRODUCT DETAILS -->
-
       <button
         class="add-button hidden"
         id="addToCartBtn"
@@ -654,7 +689,7 @@ button:disabled {
 
   <!-- SHOPPING CART -->
 
-  <section class="cart-section">
+  <section class="cart-section" id="cartSection">
 
     <div class="cart-heading">
       <h2>Shopping Cart</h2>
@@ -681,8 +716,6 @@ button:disabled {
 
     <div class="cart-list" id="cartList"></div>
 
-    <!-- CART SUMMARY -->
-
     <div class="cart-summary hidden" id="cartSummary">
 
       <div class="summary-heading">Cart Summary</div>
@@ -708,8 +741,6 @@ button:disabled {
       </div>
 
     </div>
-
-    <!-- SAVE AND VIEW CARTS -->
 
     <div class="cart-actions">
 
@@ -739,8 +770,6 @@ button:disabled {
     >
       Clear Current Cart
     </button>
-
-    <!-- SAVED CARTS PANEL -->
 
     <section class="saved-section hidden" id="savedSection">
 
@@ -1090,6 +1119,23 @@ function saveCartToStorage() {
   }
 }
 
+function normalizeCartItem(item) {
+
+  if (!item || !item.product) return null;
+
+  const quantity = Number(item.quantity);
+
+  if (!Number.isFinite(quantity)) return null;
+
+  return {
+    key: String(
+      item.key || normalizeText(item.product.name)
+    ),
+    product: item.product,
+    quantity: Math.floor(quantity)
+  };
+}
+
 function loadCartFromStorage() {
 
   try {
@@ -1109,22 +1155,8 @@ function loadCartFromStorage() {
 
       cart = Array.isArray(data.cart)
         ? data.cart
-            .filter(item =>
-              item &&
-              item.product &&
-              Number(item.quantity) > 0
-            )
-            .map(item => ({
-              key: String(
-                item.key ||
-                normalizeText(item.product.name)
-              ),
-              product: item.product,
-              quantity: Math.max(
-                1,
-                Math.floor(Number(item.quantity))
-              )
-            }))
+            .map(normalizeCartItem)
+            .filter(Boolean)
         : [];
     }
 
@@ -1279,15 +1311,8 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
+  // Keep the product in the cart even at zero or negative quantity.
   item.quantity += change;
-
-  // Automatically remove the product at quantity zero.
-  if (item.quantity <= 0) {
-
-    cart = cart.filter(cartItem =>
-      cartItem.key !== key
-    );
-  }
 
   saveCartToStorage();
   renderCart();
@@ -1316,7 +1341,7 @@ function clearEntireCart() {
 }
 
 // ==========================================
-// SAVE CURRENT CART AS A SAVED CART
+// SAVE CURRENT CART
 // ==========================================
 
 function saveCurrentCart() {
@@ -1394,19 +1419,9 @@ function loadSavedCart(id) {
     if (!confirmed) return;
   }
 
-  cart = saved.cart.map(item => ({
-    key: item.key || getCartProductKey(item.product),
-    product: {
-      name: item.product.name,
-      MRP: item.product.MRP,
-      DP: item.product.DP,
-      pv: item.product.pv
-    },
-    quantity: Math.max(
-      1,
-      Math.floor(Number(item.quantity) || 1)
-    )
-  }));
+  cart = saved.cart
+    .map(normalizeCartItem)
+    .filter(Boolean);
 
   cartName = saved.name;
 
@@ -1444,25 +1459,30 @@ function renderSavedCarts() {
 
   savedCarts.forEach(saved => {
 
-    const totalQuantity = saved.cart.reduce(
+    // Only positive quantities contribute to saved-cart totals.
+    const activeItems = saved.cart.filter(item =>
+      Number(item.quantity) > 0
+    );
+
+    const totalQuantity = activeItems.reduce(
       (sum, item) =>
-        sum + Number(item.quantity || 0),
+        sum + Number(item.quantity),
       0
     );
 
-    const totalDP = saved.cart.reduce(
+    const totalDP = activeItems.reduce(
       (sum, item) =>
         sum +
         numericValue(item.product.DP) *
-        Number(item.quantity || 0),
+        Number(item.quantity),
       0
     );
 
-    const totalPV = saved.cart.reduce(
+    const totalPV = activeItems.reduce(
       (sum, item) =>
         sum +
         numericValue(item.product.pv) *
-        Number(item.quantity || 0),
+        Number(item.quantity),
       0
     );
 
@@ -1483,8 +1503,8 @@ function renderSavedCarts() {
 
       <div class="saved-cart-info">
         Saved: ${escapeHtml(dateText)}<br>
-        Product types: ${saved.cart.length}<br>
-        Total quantity: ${totalQuantity}<br>
+        Active product types: ${activeItems.length}<br>
+        Active quantity: ${totalQuantity}<br>
         Total DP: ${escapeHtml(formatCartMoney(totalDP))}<br>
         Total PV: ${totalPV.toLocaleString("en-IN")}
       </div>
@@ -1514,6 +1534,11 @@ function renderCart() {
 
   list.innerHTML = "";
 
+  // Only products with quantity greater than zero are active.
+  const activeItems = cart.filter(item =>
+    Number(item.quantity) > 0
+  );
+
   let totalQuantity = 0;
   let totalDP = 0;
   let totalPV = 0;
@@ -1521,30 +1546,31 @@ function renderCart() {
   cart.forEach(item => {
 
     const product = item.product;
-    const quantity = item.quantity;
+    const quantity = Number(item.quantity);
+
+    const isActive = quantity > 0;
 
     const dp = numericValue(product.DP);
     const pv = numericValue(product.pv);
 
-    totalQuantity += quantity;
-    totalDP += dp * quantity;
-    totalPV += pv * quantity;
+    // Inactive items are excluded from all summary calculations.
+    if (isActive) {
+      totalQuantity += quantity;
+      totalDP += dp * quantity;
+      totalPV += pv * quantity;
+    }
 
     const row = document.createElement("div");
 
-    row.className = "cart-item";
+    row.className = "cart-item" +
+      (isActive ? "" : " inactive");
 
     row.innerHTML = `
-      <div class="cart-item-name">
-        ${escapeHtml(product.name)}
-      </div>
+      <div class="cart-item-top">
 
-      <div class="cart-item-prices">
-        <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
-        <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
-      </div>
-
-      <div class="cart-item-bottom">
+        <div class="cart-item-name">
+          ${escapeHtml(product.name)}
+        </div>
 
         <div class="quantity-controls">
 
@@ -1570,6 +1596,11 @@ function renderCart() {
 
         </div>
 
+      </div>
+
+      <div class="cart-item-prices">
+        <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
+        <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
       </div>
     `;
 
@@ -1600,7 +1631,7 @@ function renderCart() {
     (totalQuantity === 1 ? " item" : " items");
 
   $("totalProductTypes").textContent =
-    cart.length;
+    activeItems.length;
 
   $("totalQuantity").textContent =
     totalQuantity;
