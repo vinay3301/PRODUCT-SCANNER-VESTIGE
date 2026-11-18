@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#123b2a">
+  <meta name="description" content="Camera-based product information scanner">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Product Scanner</title>
+  <style>
+    :root { color-scheme:dark; --bg:#08130e; --panel:#11251a; --green:#70d69b; --muted:#a8b9ae; --line:#294536; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:#f4faf6; font:16px system-ui,-apple-system,Segoe UI,sans-serif; }
+    header { padding:16px 18px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    h1 { margin:0; font-size:20px; letter-spacing:.2px; }
+    .sub { color:var(--muted); font-size:12px; margin-top:3px }
+    main { max-width:760px; margin:auto; padding:0 12px 28px; }
+    .camera-wrap { position:relative; background:#000; border:1px solid var(--line); border-radius:18px; overflow:hidden; min-height:240px; }
+    video { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; }
+    .scan-frame { pointer-events:none; position:absolute; left:12%; top:19%; width:76%; height:54%; border:2px solid rgba(112,214,155,.9); border-radius:14px; box-shadow:0 0 0 999px rgba(0,0,0,.18); }
+    .scan-hint { position:absolute; bottom:12px; left:12px; right:12px; text-align:center; background:#06100bd9; padding:8px; border-radius:10px; font-size:12px; color:#d7e9de; }
+    .controls { display:flex; gap:10px; margin:12px 0; }
+    button { border:0; border-radius:12px; padding:13px 16px; font-weight:700; font-size:14px; cursor:pointer; }
+    .primary { background:var(--green); color:#062012; flex:1; }
+    .secondary { background:#20372a; color:#f4faf6; }
+    button:disabled { opacity:.45; cursor:not-allowed }
+    .status { color:var(--muted); font-size:13px; min-height:20px; margin:8px 3px 12px; }
+    .product-card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px; }
+    .product-name { font-size:18px; font-weight:750; line-height:1.25; }
+    .prices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+    .price { background:#1a3324; border-radius:12px; padding:11px 9px; min-width:0; }
+    .price small { color:var(--muted); display:block; font-size:11px; letter-spacing:.5px; }
+    .price strong { display:block; margin-top:4px; font-size:20px; overflow-wrap:anywhere; }
+    .match-meta { margin-top:12px; font-size:12px; color:var(--muted); }
+    .choices { display:grid; gap:8px; margin-top:12px; }
+    .choice { text-align:left; background:#1a3324; color:#fff; border:1px solid var(--line); }
+    .foot { color:#83988a; font-size:11px; line-height:1.45; padding:12px 4px; }
+    .pill { color:#bce9cc; border:1px solid #386449; border-radius:99px; padding:5px 9px; font-size:11px; white-space:nowrap; }
+    .hidden { display:none !important }
+    @media (max-width:420px) { .prices { gap:6px } .price strong { font-size:17px } }
+  </style>
+</head>
+<body>
+<header>
+  <div><h1>Product Scanner</h1><div class="sub">Camera recognition · Live product details</div></div>
+  <span class="pill" id="apiBadge">Connecting…</span>
+</header>
+<main>
+  <section class="camera-wrap">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="scan-frame"></div>
+    <div class="scan-hint">Keep the product name and size inside the frame</div>
+  </section>
+  <div class="controls">
+    <button class="primary" id="startBtn">Start camera</button>
+    <button class="secondary" id="stopBtn" disabled>Stop</button>
+  </div>
+  <div class="status" id="status">Loading product list…</div>
+  <section class="product-card">
+    <div class="product-name" id="productName">Point the camera at a product</div>
+    <div class="prices">
+      <div class="price"><small>MRP</small><strong id="mrp">—</strong></div>
+      <div class="price"><small>DP</small><strong id="dp">—</strong></div>
+      <div class="price"><small>POINTS</small><strong id="pv">—</strong></div>
+    </div>
+    <div class="match-meta" id="matchMeta">Product details will appear here when a confident match is found.</div>
+    <div class="choices hidden" id="choices"></div>
+  </section>
+  <p class="foot">For best results, use bright light, hold the phone steady, and show the product name and pack size. Recognition uses text on the packaging; it may not identify a product if the label is hidden, blurry, or curved away from the camera.</p>
+</main>
+<canvas id="canvas" class="hidden"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const API_URL = "https://vestige-products-api.vinaykinnera3301.workers.dev/";
+  const $ = id => document.getElementById(id);
+  const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
+  let products = [], stream = null, worker = null, scanTimer = null, busy = false;
+  let lastCandidate = "", repeatCount = 0;
+
+  function setStatus(message) { $("status").textContent = message; }
+
+  async function loadProducts() {
+    $("apiBadge").textContent = "Connecting…";
+    try {
+      const response = await fetch(API_URL, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        headers: { "Accept": "application/json" }
+      });
+      if (!response.ok) throw new Error("API returned HTTP " + response.status);
+      const data = await response.json();
+      if (!data || data.success !== true || !Array.isArray(data.products)) {
+        throw new Error(data && data.error ? data.error : "Invalid API response: expected success and products.");
+      }
+      products = data.products.filter(p => p && String(p.name || "").trim());
+      if (!products.length) throw new Error("API connected, but the products list is empty. Check the published products tab.");
+      $("apiBadge").textContent = products.length + " products loaded";
+      $("apiBadge").style.borderColor = "#386449";
+      setStatus("Product database ready. Start the camera to scan.");
+      return true;
+    } catch (error) {
+      products = [];
+      $("apiBadge").textContent = "API not connected";
+      $("apiBadge").style.borderColor = "#a64b4b";
+      setStatus("Product API error: " + (error && error.message ? error.message : String(error)));
+      console.error("Product API connection failed:", error);
+      return false;
+    }
+  }
+
+  function normalize(s) {
+    return String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+  }
+  const STOP_WORDS = new Set(["the", "and", "with", "for", "from", "new", "pack", "each", "use", "ml", "gm"]);
+  function tokens(s) {
+    return normalize(s).split(" ").filter(x => x.length > 1 && !STOP_WORDS.has(x));
+  }
+  // Compare complete words; tolerate a small number of common OCR character errors.
+  function wordSimilarity(a, b) {
+    if (a === b) return 1;
+    if (Math.abs(a.length - b.length) > 2 || Math.min(a.length, b.length) < 4) return 0;
+    const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      let diagonal = prev[0];
+      prev[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const above = prev[j];
+        prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+        diagonal = above;
+      }
+    }
+    const distance = prev[b.length];
+    const allowed = Math.max(a.length, b.length) >= 9 ? 2 : 1;
+    return distance <= allowed ? 1 - distance / Math.max(a.length, b.length) : 0;
+  }
+  function similarity(ocr, name) {
+    const heard = [...new Set(tokens(ocr))];
+    const wanted = [...new Set(tokens(name))];
+    if (!heard.length || !wanted.length) return { score: 0, matched: 0, words: [] };
+    let totalWeight = 0, matchedWeight = 0, matched = 0;
+    const matchedWords = [];
+    for (const word of wanted) {
+      const weight = Math.min(2.2, 0.7 + word.length / 5);
+      totalWeight += weight;
+      let best = 0;
+      for (const seen of heard) best = Math.max(best, wordSimilarity(word, seen));
+      if (best >= 0.78) {
+        matched++;
+        matchedWeight += weight * best;
+        matchedWords.push(word);
+      }
+    }
+    return { score: matchedWeight / totalWeight, matched, words: matchedWords };
+  }
+  function formatMoney(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(String(value).replace(/,/g, ""));
+    return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(value);
+  }
+  function showProduct(product, score, uncertain = false) {
+    $("productName").textContent = product.name || "Product";
+    $("mrp").textContent = formatMoney(product.MRP);
+    $("dp").textContent = formatMoney(product.DP);
+    $("pv").textContent = product.pv ?? "—";
+    $("matchMeta").textContent = (uncertain ? "Possible match — please verify the product name and size. " : "Matched from packaging text. ") + "Match confidence: " + Math.round(score * 100) + "%";
+    $("choices").classList.add("hidden");
+    $("choices").innerHTML = "";
+  }
+  function findMatches(text) {
+    return products.map(product => {
+      const result = similarity(text, product.name);
+      return { p: product, score: result.score, matched: result.matched, matchedWords: result.words };
+    }).sort((a, b) => b.score - a.score);
+  }
+  function displayMatches(matches) {
+    const best = matches[0], second = matches[1];
+    if (!best || best.score < 0.42 || (best.matched < 2 && best.score < 0.78)) {
+      setStatus("Not enough matching product words yet. Show at least two clear words from the product name.");
+      return;
+    }
+    if (best.score < 0.68 || (second && best.score - second.score < 0.12)) {
+      $("productName").textContent = "More than one possible match";
+      $("matchMeta").textContent = "Choose the correct product below. Similar product names are not selected automatically.";
+      const box = $("choices");
+      box.innerHTML = "";
+      box.classList.remove("hidden");
+      matches.slice(0, 4).filter(item => item.score > 0.3).forEach(item => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.textContent = item.p.name + " · " + Math.round(item.score * 100) + "%";
+        button.onclick = () => showProduct(item.p, item.score, true);
+        box.appendChild(button);
+      });
+      setStatus("Please confirm which product you are scanning.");
+      return;
+    }
+    showProduct(best.p, best.score, false);
+    setStatus("Product identified. Keep scanning or point at another product.");
+  }
+  async function scanFrame() {
+    if (busy || !worker || !stream || video.readyState < 2) return;
+    busy = true;
+    try {
+      const width = video.videoWidth, height = video.videoHeight;
+      if (!width || !height) return;
+      const cropW = Math.round(width * 0.78), cropH = Math.round(height * 0.58);
+      const sx = Math.round((width - cropW) / 2), sy = Math.round((height - cropH) / 2);
+      const scale = Math.min(1, 1000 / cropW);
+      canvas.width = Math.max(1, Math.round(cropW * scale));
+      canvas.height = Math.max(1, Math.round(cropH * scale));
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      const result = await worker.recognize(canvas);
+      const matches = findMatches(result.data.text || "");
+      const best = matches[0];
+      if (best && best.score >= 0.42 && (best.matched >= 2 || best.score >= 0.78)) {
+        const key = normalize(best.p.name);
+        if (key === lastCandidate) repeatCount++;
+        else { lastCandidate = key; repeatCount = 1; }
+        if (repeatCount >= 2) displayMatches(matches);
+        else setStatus("Reading label… hold steady for another moment.");
+      } else {
+        lastCandidate = "";
+        repeatCount = 0;
+        setStatus("Reading packaging… keep the product name inside the frame.");
+      }
+    } catch (error) {
+      setStatus("Scanning issue: " + error.message);
+    } finally {
+      busy = false;
+    }
+  }
+  async function startCamera() {
+    try {
+      if (!products.length) {
+        const loaded = await loadProducts();
+        if (!loaded) return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access is unavailable. Open this scanner over HTTPS in a supported browser.");
+      }
+      setStatus("Requesting camera permission…");
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      $("startBtn").disabled = true;
+      $("stopBtn").disabled = false;
+      setStatus("Loading text recognition… this may take a little time the first time.");
+      if (!worker) worker = await Tesseract.createWorker("eng");
+      setStatus("Camera ready. Checking for a new frame every 0.5 seconds; OCR runs sequentially.");
+      scanTimer = setInterval(scanFrame, 500);
+    } catch (error) {
+      setStatus("Could not start camera: " + error.message + ". Open this app over HTTPS and allow camera access.");
+      stopCamera(false);
+    }
+  }
+  function stopCamera(updateStatus = true) {
+    if (scanTimer) clearInterval(scanTimer);
+    scanTimer = null;
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    $("startBtn").disabled = false;
+    $("stopBtn").disabled = true;
+    if (updateStatus) setStatus("Camera stopped. Text recognition remains ready for the next scan.");
+  }
+  $("startBtn").addEventListener("click", startCamera);
+  $("stopBtn").addEventListener("click", () => stopCamera());
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(error => console.warn("Service worker registration failed:", error)));
+  }
+  loadProducts();
+})();
+</script>
+</body>
+</html>
