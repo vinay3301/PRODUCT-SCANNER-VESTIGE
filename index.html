@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -145,13 +144,8 @@ button:disabled {
   padding:16px;
 }
 
-.product-main-row {
-  display:block;
-}
-
-.product-details {
-  min-width:0;
-}
+.product-main-row { display:block }
+.product-details { min-width:0 }
 
 .product-title-row {
   display:flex;
@@ -266,9 +260,7 @@ button:disabled {
 
 .hidden { display:none !important }
 
-/* =====================================
-   CART
-===================================== */
+/* CART */
 
 .cart-section {
   margin-top:18px;
@@ -320,9 +312,7 @@ button:disabled {
   outline:none;
 }
 
-.cart-name-input:focus {
-  border-color:var(--green);
-}
+.cart-name-input:focus { border-color:var(--green) }
 
 .cart-empty {
   text-align:center;
@@ -339,8 +329,6 @@ button:disabled {
   margin-top:12px;
 }
 
-/* Compact horizontal cart row */
-
 .cart-item {
   background:#1a3324;
   border:1px solid var(--line);
@@ -350,11 +338,9 @@ button:disabled {
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  transition:opacity .2s ease, border-color .2s ease;
+  transition:opacity .2s ease,border-color .2s ease;
   min-width:0;
 }
-
-/* Quantity zero or below: keep visible but faded */
 
 .cart-item.inactive {
   opacity:.38;
@@ -453,8 +439,6 @@ button:disabled {
   font-size:19px;
 }
 
-/* CART ACTION BUTTONS */
-
 .cart-actions {
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -470,6 +454,11 @@ button:disabled {
 .view-saved-btn {
   background:#20372a;
   color:#f4faf6;
+}
+
+.export-cart-btn {
+  background:#294936;
+  color:#e5f8eb;
 }
 
 .clear-cart-btn {
@@ -525,15 +514,27 @@ button:disabled {
 }
 
 .saved-cart-actions {
-  display:flex;
+  display:grid;
+  grid-template-columns:1fr 1fr;
   gap:8px;
   margin-top:10px;
 }
 
 .load-saved-btn {
-  flex:1;
   background:var(--green);
   color:#062012;
+  padding:10px;
+}
+
+.export-saved-btn {
+  background:#294936;
+  color:#e5f8eb;
+  padding:10px;
+}
+
+.delete-saved-btn {
+  background:#482824;
+  color:#ffd2cc;
   padding:10px;
 }
 
@@ -552,18 +553,14 @@ button:disabled {
     padding:10px;
   }
 
-  .cart-item-name {
-    font-size:13px;
-  }
+  .cart-item-name { font-size:13px }
 
   .cart-item-prices {
     gap:8px;
     font-size:11px;
   }
 
-  .quantity-controls {
-    gap:5px;
-  }
+  .quantity-controls { gap:5px }
 
   .quantity-btn {
     width:29px;
@@ -575,19 +572,12 @@ button:disabled {
     font-size:14px;
   }
 
-  .cart-actions {
-    gap:8px;
-  }
+  .cart-actions { gap:8px }
 }
 
 @media (max-width:350px) {
-  .product-title-row {
-    gap:6px;
-  }
-
-  .product-name {
-    font-size:16px;
-  }
+  .product-title-row { gap:6px }
+  .product-name { font-size:16px }
 
   #addToCartBtn {
     padding:7px 8px;
@@ -609,13 +599,10 @@ button:disabled {
     height:28px;
   }
 
-  .quantity-value {
-    min-width:18px;
-  }
+  .quantity-value { min-width:18px }
 
-  .cart-actions {
-    grid-template-columns:1fr;
-  }
+  .cart-actions { grid-template-columns:1fr }
+  .saved-cart-actions { grid-template-columns:1fr }
 }
 </style>
 </head>
@@ -656,28 +643,17 @@ button:disabled {
     Loading product list…
   </div>
 
-  <!-- PRODUCT DETAILS -->
-
   <section class="product-card">
-
     <div class="product-main-row">
-
       <div class="product-details">
-
         <div class="product-title-row">
-
           <div class="product-name" id="productName">
             Point the camera at a product
           </div>
 
-          <button
-            class="add-button hidden"
-            id="addToCartBtn"
-            type="button"
-          >
+          <button class="add-button hidden" id="addToCartBtn" type="button">
             ＋ Add to Cart
           </button>
-
         </div>
 
         <div class="prices">
@@ -685,20 +661,16 @@ button:disabled {
             <small>MRP</small>
             <strong id="mrp">—</strong>
           </div>
-
           <div class="price">
             <small>DP</small>
             <strong id="dp">—</strong>
           </div>
-
           <div class="price">
             <small>POINTS</small>
             <strong id="pv">—</strong>
           </div>
         </div>
-
       </div>
-
     </div>
 
     <div class="match-meta" id="matchMeta">
@@ -706,9 +678,7 @@ button:disabled {
     </div>
 
     <div class="choices hidden" id="choices"></div>
-
     <div class="match-meta hidden" id="selectionNote"></div>
-
   </section>
 
   <!-- SHOPPING CART -->
@@ -741,7 +711,6 @@ button:disabled {
     <div class="cart-list" id="cartList"></div>
 
     <div class="cart-summary hidden" id="cartSummary">
-
       <div class="summary-heading">Cart Summary</div>
 
       <div class="summary-row">
@@ -763,48 +732,31 @@ button:disabled {
         <span>Total PV</span>
         <strong id="totalPV">0</strong>
       </div>
-
     </div>
 
     <div class="cart-actions">
-
-      <button
-        class="save-cart-btn"
-        id="saveCartBtn"
-        type="button"
-        disabled
-      >
+      <button class="save-cart-btn" id="saveCartBtn" type="button" disabled>
         Save Cart
       </button>
 
-      <button
-        class="view-saved-btn"
-        id="viewSavedBtn"
-        type="button"
-      >
+      <button class="view-saved-btn" id="viewSavedBtn" type="button">
         View Saved Carts
       </button>
 
+      <button class="export-cart-btn" id="exportCartBtn" type="button" disabled>
+        Export Cart Image
+      </button>
     </div>
 
-    <button
-      class="clear-cart-btn hidden"
-      id="clearCartBtn"
-      type="button"
-    >
+    <button class="clear-cart-btn hidden" id="clearCartBtn" type="button">
       Clear Current Cart
     </button>
 
     <section class="saved-section hidden" id="savedSection">
-
       <div class="saved-heading">
         <h2>Saved Carts</h2>
 
-        <button
-          class="close-saved-btn"
-          id="closeSavedBtn"
-          type="button"
-        >
+        <button class="close-saved-btn" id="closeSavedBtn" type="button">
           Close
         </button>
       </div>
@@ -814,7 +766,6 @@ button:disabled {
       </div>
 
       <div class="saved-list" id="savedList"></div>
-
     </section>
 
   </section>
@@ -955,7 +906,6 @@ function clearProductDisplay() {
 async function loadProducts() {
 
   if (products.length) return true;
-
   if (productsLoading) return productsLoading;
 
   productsLoading = (async () => {
@@ -974,9 +924,7 @@ async function loadProducts() {
       });
 
       if (!response.ok) {
-        throw new Error(
-          "API returned HTTP " + response.status
-        );
+        throw new Error("API returned HTTP " + response.status);
       }
 
       const data = await response.json();
@@ -986,9 +934,7 @@ async function loadProducts() {
         data.success !== true ||
         !Array.isArray(data.products)
       ) {
-        throw new Error(
-          data?.error || "Invalid product API response."
-        );
+        throw new Error(data?.error || "Invalid product API response.");
       }
 
       products = data.products.filter(p =>
@@ -1004,9 +950,7 @@ async function loadProducts() {
 
       $("apiBadge").style.borderColor = "#386449";
 
-      setStatus(
-        "Product database ready. Start the camera to scan."
-      );
+      setStatus("Product database ready. Start the camera to scan.");
 
       return true;
 
@@ -1040,11 +984,7 @@ async function loadProducts() {
 
 function numericValue(value) {
 
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
+  if (value === null || value === undefined || value === "") {
     return 0;
   }
 
@@ -1057,11 +997,7 @@ function numericValue(value) {
 
 function formatMoney(value) {
 
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
+  if (value === null || value === undefined || value === "") {
     return "—";
   }
 
@@ -1123,10 +1059,7 @@ function saveCartToStorage() {
 
     localStorage.setItem(
       CART_STORAGE_KEY,
-      JSON.stringify({
-        cartName,
-        cart
-      })
+      JSON.stringify({ cartName, cart })
     );
 
     return true;
@@ -1152,9 +1085,7 @@ function normalizeCartItem(item) {
   if (!Number.isFinite(quantity)) return null;
 
   return {
-    key: String(
-      item.key || normalizeText(item.product.name)
-    ),
+    key: String(item.key || normalizeText(item.product.name)),
     product: item.product,
     quantity: Math.floor(quantity)
   };
@@ -1164,9 +1095,7 @@ function loadCartFromStorage() {
 
   try {
 
-    const saved = localStorage.getItem(
-      CART_STORAGE_KEY
-    );
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
 
     if (!saved) {
       cart = [];
@@ -1178,9 +1107,7 @@ function loadCartFromStorage() {
       cartName = String(data.cartName || "");
 
       cart = Array.isArray(data.cart)
-        ? data.cart
-            .map(normalizeCartItem)
-            .filter(Boolean)
+        ? data.cart.map(normalizeCartItem).filter(Boolean)
         : [];
     }
 
@@ -1216,9 +1143,7 @@ function saveSavedCartsToStorage() {
 
     console.warn("Could not save saved carts:", error);
 
-    setStatus(
-      "Could not save cart. Browser storage may be full."
-    );
+    setStatus("Could not save cart. Browser storage may be full.");
 
     return false;
   }
@@ -1228,10 +1153,7 @@ function loadSavedCartsFromStorage() {
 
   try {
 
-    const saved = localStorage.getItem(
-      SAVED_CARTS_STORAGE_KEY
-    );
-
+    const saved = localStorage.getItem(SAVED_CARTS_STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : [];
 
     savedCarts = Array.isArray(parsed)
@@ -1245,7 +1167,6 @@ function loadSavedCartsFromStorage() {
   } catch (error) {
 
     console.warn("Could not load saved carts:", error);
-
     savedCarts = [];
   }
 
@@ -1266,9 +1187,7 @@ function getCartProductKey(product) {
 
 function addSelectedProductToCart() {
 
-  if (!selectedProduct) {
-    return;
-  }
+  if (!selectedProduct) return;
 
   const product = selectedProduct;
   const key = getCartProductKey(product);
@@ -1278,18 +1197,11 @@ function addSelectedProductToCart() {
     return;
   }
 
-  const existing = cart.find(item =>
-    item.key === key
-  );
+  const existing = cart.find(item => item.key === key);
 
   if (existing) {
-
-    // If quantity was zero or negative, adding a product
-    // increases it by one instead of creating a duplicate.
     existing.quantity += 1;
-
   } else {
-
     cart.push({
       key,
       product: {
@@ -1305,23 +1217,24 @@ function addSelectedProductToCart() {
   saveCartToStorage();
   renderCart();
 
-  const addedItem = cart.find(item =>
-    item.key === key
-  );
+  const addedItem = cart.find(item => item.key === key);
 
   $("addToCartBtn").textContent = "Added ✓";
 
   $("selectionNote").textContent =
     "✓ Added to cart. Current quantity: " +
-    addedItem.quantity +
-    ".";
+    addedItem.quantity + ".";
 
   $("selectionNote").classList.remove("hidden");
 
+  // FEATURE 1:
+  // Remove all five suggestions after adding a product.
+  $("choices").innerHTML = "";
+  $("choices").classList.add("hidden");
+
   setStatus(
-    "Added to cart: " +
-    product.name +
-    ". You can scan another product."
+    "Added to cart: " + product.name +
+    ". Suggestions cleared. You can scan another product."
   );
 }
 
@@ -1331,16 +1244,12 @@ function addSelectedProductToCart() {
 
 function changeCartQuantity(key, change) {
 
-  const item = cart.find(item =>
-    item.key === key
-  );
+  const item = cart.find(item => item.key === key);
 
   if (!item) return;
 
-  // IMPORTANT:
-  // Never remove the item when quantity reaches zero.
-  // Zero and negative quantities remain in the cart,
-  // appear faded, and are excluded from totals.
+  // Keep zero and negative quantities in the cart.
+  // They remain faded and are excluded from totals.
 
   item.quantity += change;
 
@@ -1384,8 +1293,7 @@ function saveCurrentCart() {
   const enteredName = cartName.trim();
 
   const defaultName =
-    "Cart " +
-    new Date().toLocaleString("en-IN");
+    "Cart " + new Date().toLocaleString("en-IN");
 
   const name = enteredName || defaultName;
 
@@ -1417,13 +1325,9 @@ function saveCurrentCart() {
 
   renderSavedCarts();
 
-  setStatus(
-    'Cart "' + name + '" saved successfully.'
-  );
+  setStatus('Cart "' + name + '" saved successfully.');
 
-  alert(
-    'Cart "' + name + '" has been saved.'
-  );
+  alert('Cart "' + name + '" has been saved.');
 }
 
 // ==========================================
@@ -1432,9 +1336,7 @@ function saveCurrentCart() {
 
 function loadSavedCart(id) {
 
-  const saved = savedCarts.find(item =>
-    item.id === id
-  );
+  const saved = savedCarts.find(item => item.id === id);
 
   if (!saved) return;
 
@@ -1450,12 +1352,8 @@ function loadSavedCart(id) {
   }
 
   // Preserve zero and negative quantities.
-  // Do not filter them out or force them to 1.
 
-  cart = saved.cart
-    .map(normalizeCartItem)
-    .filter(Boolean);
-
+  cart = saved.cart.map(normalizeCartItem).filter(Boolean);
   cartName = saved.name;
 
   $("cartName").value = cartName;
@@ -1465,14 +1363,82 @@ function loadSavedCart(id) {
 
   $("savedSection").classList.add("hidden");
 
-  setStatus(
-    'Loaded saved cart: "' + saved.name + '".'
-  );
+  setStatus('Loaded saved cart: "' + saved.name + '".');
 
   $("cartSection").scrollIntoView({
     behavior:"smooth",
     block:"start"
   });
+}
+
+// ==========================================
+// FEATURE 2: DELETE SAVED CART
+// ==========================================
+
+function deleteSavedCart(id) {
+
+  const saved = savedCarts.find(item => item.id === id);
+
+  if (!saved) return;
+
+  const confirmed = confirm(
+    'Are you sure you want to permanently delete "' +
+    saved.name + '"?'
+  );
+
+  if (!confirmed) return;
+
+  const previous = savedCarts;
+
+  savedCarts = savedCarts.filter(item => item.id !== id);
+
+  if (!saveSavedCartsToStorage()) {
+    savedCarts = previous;
+    return;
+  }
+
+  renderSavedCarts();
+
+  setStatus('Deleted saved cart: "' + saved.name + '".');
+}
+
+// ==========================================
+// CART TOTAL CALCULATION
+// ==========================================
+
+function calculateCartTotals(items) {
+
+  const activeItems = items.filter(item =>
+    Number(item.quantity) > 0
+  );
+
+  const totalQuantity = activeItems.reduce(
+    (sum, item) => sum + Number(item.quantity),
+    0
+  );
+
+  const totalDP = activeItems.reduce(
+    (sum, item) =>
+      sum +
+      numericValue(item.product.DP) *
+      Number(item.quantity),
+    0
+  );
+
+  const totalPV = activeItems.reduce(
+    (sum, item) =>
+      sum +
+      numericValue(item.product.pv) *
+      Number(item.quantity),
+    0
+  );
+
+  return {
+    activeItems,
+    totalQuantity,
+    totalDP,
+    totalPV
+  };
 }
 
 // ==========================================
@@ -1492,32 +1458,7 @@ function renderSavedCarts() {
 
   savedCarts.forEach(saved => {
 
-    // Only positive quantities contribute to totals.
-    const activeItems = saved.cart.filter(item =>
-      Number(item.quantity) > 0
-    );
-
-    const totalQuantity = activeItems.reduce(
-      (sum, item) =>
-        sum + Number(item.quantity),
-      0
-    );
-
-    const totalDP = activeItems.reduce(
-      (sum, item) =>
-        sum +
-        numericValue(item.product.DP) *
-        Number(item.quantity),
-      0
-    );
-
-    const totalPV = activeItems.reduce(
-      (sum, item) =>
-        sum +
-        numericValue(item.product.pv) *
-        Number(item.quantity),
-      0
-    );
+    const totals = calculateCartTotals(saved.cart);
 
     const savedDate = new Date(saved.savedAt);
 
@@ -1536,20 +1477,38 @@ function renderSavedCarts() {
 
       <div class="saved-cart-info">
         Saved: ${escapeHtml(dateText)}<br>
-        Active product types: ${activeItems.length}<br>
-        Active quantity: ${totalQuantity}<br>
-        Total DP: ${escapeHtml(formatCartMoney(totalDP))}<br>
-        Total PV: ${totalPV.toLocaleString("en-IN")}
+        Active product types: ${totals.activeItems.length}<br>
+        Active quantity: ${totals.totalQuantity}<br>
+        Total DP: ${escapeHtml(formatCartMoney(totals.totalDP))}<br>
+        Total PV: ${totals.totalPV.toLocaleString("en-IN")}
       </div>
 
       <div class="saved-cart-actions">
+
         <button
           type="button"
           class="load-saved-btn"
           data-load-id="${escapeHtml(saved.id)}"
         >
-          Load this cart
+          Load
         </button>
+
+        <button
+          type="button"
+          class="export-saved-btn"
+          data-export-id="${escapeHtml(saved.id)}"
+        >
+          Export Image
+        </button>
+
+        <button
+          type="button"
+          class="delete-saved-btn"
+          data-delete-id="${escapeHtml(saved.id)}"
+        >
+          Delete
+        </button>
+
       </div>
     `;
 
@@ -1567,14 +1526,7 @@ function renderCart() {
 
   list.innerHTML = "";
 
-  // Only quantities greater than zero are active.
-  const activeItems = cart.filter(item =>
-    Number(item.quantity) > 0
-  );
-
-  let totalQuantity = 0;
-  let totalDP = 0;
-  let totalPV = 0;
+  const totals = calculateCartTotals(cart);
 
   cart.forEach(item => {
 
@@ -1582,16 +1534,6 @@ function renderCart() {
     const quantity = Number(item.quantity);
 
     const isActive = quantity > 0;
-
-    const dp = numericValue(product.DP);
-    const pv = numericValue(product.pv);
-
-    // Only positive quantities contribute to totals.
-    if (isActive) {
-      totalQuantity += quantity;
-      totalDP += dp * quantity;
-      totalPV += pv * quantity;
-    }
 
     const row = document.createElement("div");
 
@@ -1622,9 +1564,7 @@ function renderCart() {
           aria-label="Decrease quantity"
         >−</button>
 
-        <span class="quantity-value">
-          ${quantity}
-        </span>
+        <span class="quantity-value">${quantity}</span>
 
         <button
           type="button"
@@ -1642,44 +1582,452 @@ function renderCart() {
 
   const hasItems = cart.length > 0;
 
-  $("cartEmpty").classList.toggle(
-    "hidden",
-    hasItems
-  );
-
-  // Keep summary visible if cart contains rows,
-  // even if all quantities are zero or negative.
-
-  $("cartSummary").classList.toggle(
-    "hidden",
-    !hasItems
-  );
-
-  $("clearCartBtn").classList.toggle(
-    "hidden",
-    !hasItems
-  );
+  $("cartEmpty").classList.toggle("hidden", hasItems);
+  $("cartSummary").classList.toggle("hidden", !hasItems);
+  $("clearCartBtn").classList.toggle("hidden", !hasItems);
 
   $("saveCartBtn").disabled = !hasItems;
+  $("exportCartBtn").disabled = !hasItems;
 
-  // Cart badge shows only active quantity.
   $("cartCount").textContent =
-    totalQuantity +
-    (totalQuantity === 1 ? " item" : " items");
+    totals.totalQuantity +
+    (totals.totalQuantity === 1 ? " item" : " items");
 
   $("totalProductTypes").textContent =
-    activeItems.length;
+    totals.activeItems.length;
 
   $("totalQuantity").textContent =
-    totalQuantity;
+    totals.totalQuantity;
 
   $("totalDP").textContent =
-    formatCartMoney(totalDP);
+    formatCartMoney(totals.totalDP);
 
   $("totalPV").textContent =
-    totalPV.toLocaleString("en-IN", {
+    totals.totalPV.toLocaleString("en-IN", {
       maximumFractionDigits: 2
     });
+}
+
+// ==========================================
+// FEATURE 3: CREATE CART IMAGE
+// ==========================================
+
+function roundedRect(ctx, x, y, width, height, radius) {
+
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+
+    const test = line ? line + " " + word : word;
+
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+
+  if (line) lines.push(line);
+
+  return lines;
+}
+
+function createCartImage(cartData) {
+
+  return new Promise((resolve, reject) => {
+
+    try {
+
+      const items = cartData.cart || [];
+      const totals = calculateCartTotals(items);
+
+      const width = 1000;
+      const padding = 55;
+      const contentWidth = width - padding * 2;
+
+      const rowLayouts = [];
+
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+
+      tempCtx.font = "bold 27px Arial";
+
+      let totalHeight = 0;
+
+      items.forEach(item => {
+
+        const quantity = Number(item.quantity);
+        const productName = String(item.product.name || "Product");
+
+        tempCtx.font = "bold 27px Arial";
+
+        const nameLines = wrapCanvasText(
+          tempCtx,
+          productName,
+          560
+        );
+
+        const rowHeight = Math.max(
+          100,
+          42 + nameLines.length * 34
+        );
+
+        rowLayouts.push({
+          item,
+          nameLines,
+          rowHeight
+        });
+
+        totalHeight += rowHeight + 14;
+      });
+
+      const headerHeight = 230;
+      const summaryHeight = 250;
+      const footerHeight = 100;
+
+      const height = Math.max(
+        650,
+        padding +
+        headerHeight +
+        totalHeight +
+        summaryHeight +
+        footerHeight
+      );
+
+      const output = document.createElement("canvas");
+
+      output.width = width;
+      output.height = height;
+
+      const c = output.getContext("2d");
+
+      // Background
+      c.fillStyle = "#08130e";
+      c.fillRect(0, 0, width, height);
+
+      // Header
+      c.fillStyle = "#123b2a";
+      roundedRect(c, padding, padding, contentWidth, 175, 25);
+      c.fill();
+
+      c.fillStyle = "#70d69b";
+      c.font = "bold 38px Arial";
+      c.fillText("PRODUCT CART", padding + 30, padding + 55);
+
+      c.fillStyle = "#ffffff";
+      c.font = "bold 34px Arial";
+
+      const titleLines = wrapCanvasText(
+        c,
+        cartData.name || "Shopping Cart",
+        contentWidth - 60
+      );
+
+      c.fillText(
+        titleLines[0] || "Shopping Cart",
+        padding + 30,
+        padding + 105
+      );
+
+      c.fillStyle = "#c5d8cb";
+      c.font = "20px Arial";
+
+      const dateText = cartData.savedAt
+        ? new Date(cartData.savedAt).toLocaleString("en-IN")
+        : new Date().toLocaleString("en-IN");
+
+      c.fillText(dateText, padding + 30, padding + 145);
+
+      // Column headings
+      let y = padding + headerHeight;
+
+      c.fillStyle = "#70d69b";
+      c.font = "bold 21px Arial";
+
+      c.fillText("PRODUCT", padding + 15, y);
+      c.fillText("QTY", 700, y);
+      c.fillText("DP", 800, y);
+      c.fillText("PV", 900, y);
+
+      y += 22;
+
+      // Product rows
+      rowLayouts.forEach((layout, index) => {
+
+        const item = layout.item;
+        const quantity = Number(item.quantity);
+        const active = quantity > 0;
+
+        y += 12;
+
+        c.fillStyle = active ? "#173323" : "#202923";
+
+        roundedRect(
+          c,
+          padding,
+          y,
+          contentWidth,
+          layout.rowHeight,
+          16
+        );
+
+        c.fill();
+
+        c.globalAlpha = active ? 1 : 0.45;
+
+        c.fillStyle = "#ffffff";
+        c.font = "bold 27px Arial";
+
+        let nameY = y + 38;
+
+        layout.nameLines.forEach(line => {
+          c.fillText(line, padding + 20, nameY);
+          nameY += 34;
+        });
+
+        c.font = "22px Arial";
+        c.fillStyle = "#c5d8cb";
+
+        c.fillText(String(quantity), 700, y + 43);
+
+        c.fillText(
+          formatCartMoney(numericValue(item.product.DP)),
+          800,
+          y + 43
+        );
+
+        c.fillText(
+          String(item.product.pv ?? "—"),
+          900,
+          y + 43
+        );
+
+        if (!active) {
+          c.font = "italic 16px Arial";
+          c.fillStyle = "#f0b6a9";
+          c.fillText("Excluded from totals", padding + 20, y + layout.rowHeight - 12);
+        }
+
+        c.globalAlpha = 1;
+
+        y += layout.rowHeight;
+      });
+
+      // Summary card
+      y += 28;
+
+      c.fillStyle = "#123b2a";
+      roundedRect(c, padding, y, contentWidth, summaryHeight - 20, 20);
+      c.fill();
+
+      c.fillStyle = "#70d69b";
+      c.font = "bold 29px Arial";
+      c.fillText("CART SUMMARY", padding + 25, y + 48);
+
+      c.fillStyle = "#ffffff";
+      c.font = "24px Arial";
+
+      c.fillText(
+        "Active product types: " + totals.activeItems.length,
+        padding + 25,
+        y + 95
+      );
+
+      c.fillText(
+        "Active quantity: " + totals.totalQuantity,
+        padding + 25,
+        y + 135
+      );
+
+      c.fillText(
+        "Total DP: " + formatCartMoney(totals.totalDP),
+        padding + 25,
+        y + 175
+      );
+
+      c.fillText(
+        "Total PV: " + totals.totalPV.toLocaleString("en-IN"),
+        padding + 500,
+        y + 175
+      );
+
+      // Footer
+      c.fillStyle = "#a8b9ae";
+      c.font = "18px Arial";
+      c.fillText("Generated by Product Scanner", padding, height - 45);
+
+      output.toBlob(blob => {
+
+        if (!blob) {
+          reject(new Error("Could not generate cart image."));
+          return;
+        }
+
+        resolve(blob);
+
+      }, "image/png");
+
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// ==========================================
+// SHARE OR DOWNLOAD CART IMAGE
+// ==========================================
+
+async function exportCartAsImage(cartData) {
+
+  try {
+
+    setStatus("Preparing cart image…");
+
+    const blob = await createCartImage(cartData);
+
+    const safeName = String(cartData.name || "cart")
+      .replace(/[^a-z0-9-_]/gi, "_")
+      .slice(0, 50);
+
+    const fileName = safeName + ".png";
+
+    const file = new File(
+      [blob],
+      fileName,
+      { type:"image/png" }
+    );
+
+    const shareText =
+      "Cart: " + (cartData.name || "Shopping Cart") +
+      "\nTotal DP: " +
+      formatCartMoney(calculateCartTotals(cartData.cart).totalDP) +
+      "\nTotal PV: " +
+      calculateCartTotals(cartData.cart).totalPV;
+
+    // Prefer native sharing with image attachment.
+    if (
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files:[file] })
+    ) {
+
+      await navigator.share({
+        title: cartData.name || "Shopping Cart",
+        text: shareText,
+        files:[file]
+      });
+
+      setStatus("Cart image shared successfully.");
+      return;
+    }
+
+    // Fallback: download the image.
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = fileName;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+
+    // Offer WhatsApp text sharing as an additional fallback.
+    const shareTextUrl =
+      "https://wa.me/?text=" +
+      encodeURIComponent(shareText);
+
+    const openWhatsApp = confirm(
+      "Your cart image has been downloaded. " +
+      "Your browser does not support direct image sharing here. " +
+      "Would you also like to open WhatsApp with the cart details?"
+    );
+
+    if (openWhatsApp) {
+      window.open(shareTextUrl, "_blank");
+    }
+
+    setStatus(
+      "Cart image downloaded. You can attach it in WhatsApp or another app."
+    );
+
+  } catch (error) {
+
+    if (error?.name === "AbortError") {
+      setStatus("Sharing cancelled.");
+      return;
+    }
+
+    console.error("Cart image export error:", error);
+
+    setStatus(
+      "Could not export cart image: " +
+      (error?.message || String(error))
+    );
+
+    alert(
+      "Could not export cart image. " +
+      (error?.message || String(error))
+    );
+  }
+}
+
+// ==========================================
+// EXPORT CURRENT CART
+// ==========================================
+
+function exportCurrentCart() {
+
+  if (!cart.length) {
+    alert("Your cart is empty.");
+    return;
+  }
+
+  const data = {
+    name: cartName.trim() || "Shopping Cart",
+    savedAt: new Date().toISOString(),
+    cart: cart.map(item => ({
+      key: item.key,
+      product: { ...item.product },
+      quantity: item.quantity
+    }))
+  };
+
+  exportCartAsImage(data);
+}
+
+// ==========================================
+// EXPORT SAVED CART
+// ==========================================
+
+function exportSavedCart(id) {
+
+  const saved = savedCarts.find(item => item.id === id);
+
+  if (!saved) return;
+
+  exportCartAsImage(saved);
 }
 
 // ==========================================
@@ -1688,9 +2036,7 @@ function renderCart() {
 
 $("cartList").addEventListener("click", event => {
 
-  const button = event.target.closest(
-    "button[data-action]"
-  );
+  const button = event.target.closest("button[data-action]");
 
   if (!button) return;
 
@@ -1708,13 +2054,25 @@ $("cartList").addEventListener("click", event => {
 
 $("savedList").addEventListener("click", event => {
 
-  const button = event.target.closest(
-    "button[data-load-id]"
-  );
+  const loadButton = event.target.closest("button[data-load-id]");
 
-  if (!button) return;
+  if (loadButton) {
+    loadSavedCart(loadButton.dataset.loadId);
+    return;
+  }
 
-  loadSavedCart(button.dataset.loadId);
+  const deleteButton = event.target.closest("button[data-delete-id]");
+
+  if (deleteButton) {
+    deleteSavedCart(deleteButton.dataset.deleteId);
+    return;
+  }
+
+  const exportButton = event.target.closest("button[data-export-id]");
+
+  if (exportButton) {
+    exportSavedCart(exportButton.dataset.exportId);
+  }
 });
 
 $("cartName").addEventListener("input", () => {
@@ -1724,10 +2082,9 @@ $("cartName").addEventListener("input", () => {
   saveCartToStorage();
 });
 
-$("saveCartBtn").addEventListener(
-  "click",
-  saveCurrentCart
-);
+$("saveCartBtn").addEventListener("click", saveCurrentCart);
+
+$("exportCartBtn").addEventListener("click", exportCurrentCart);
 
 $("viewSavedBtn").addEventListener("click", () => {
 
@@ -1748,10 +2105,7 @@ $("closeSavedBtn").addEventListener("click", () => {
   $("savedSection").classList.add("hidden");
 });
 
-$("clearCartBtn").addEventListener(
-  "click",
-  clearEntireCart
-);
+$("clearCartBtn").addEventListener("click", clearEntireCart);
 
 $("addToCartBtn").addEventListener(
   "click",
@@ -1772,7 +2126,6 @@ function getTokens(str) {
 function levenshtein(a, b) {
 
   if (a === b) return 0;
-
   if (!a.length) return b.length;
   if (!b.length) return a.length;
 
@@ -1791,8 +2144,7 @@ function levenshtein(a, b) {
 
     for (let j = 1; j <= b.length; j++) {
 
-      const cost =
-        a[i - 1] === b[j - 1] ? 0 : 1;
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
 
       current[j] = Math.min(
         current[j - 1] + 1,
@@ -1810,7 +2162,6 @@ function levenshtein(a, b) {
 function tokenSimilarity(a, b) {
 
   if (a === b) return 1;
-
   if (!a || !b) return 0;
 
   if (
@@ -1828,40 +2179,22 @@ function tokenSimilarity(a, b) {
   if (maxLength < 4) return 0;
 
   const distance = levenshtein(a, b);
+  const similarity = 1 - distance / maxLength;
 
-  const similarity =
-    1 - distance / maxLength;
+  if (maxLength <= 5 && distance > 1) return 0;
 
-  if (maxLength <= 5 && distance > 1) {
-    return 0;
-  }
-
-  if (similarity >= 0.70) {
-    return similarity;
-  }
+  if (similarity >= 0.70) return similarity;
 
   return 0;
 }
 
 function scoreMatch(ocrText, productName) {
 
-  const ocrTokens = [
-    ...new Set(getTokens(ocrText))
-  ];
+  const ocrTokens = [...new Set(getTokens(ocrText))];
+  const productTokens = [...new Set(getTokens(productName))];
 
-  const productTokens = [
-    ...new Set(getTokens(productName))
-  ];
-
-  if (
-    !ocrTokens.length ||
-    !productTokens.length
-  ) {
-    return {
-      score: 0,
-      matchedTokens: 0,
-      coverage: 0
-    };
+  if (!ocrTokens.length || !productTokens.length) {
+    return { score:0, matchedTokens:0, coverage:0 };
   }
 
   let totalScore = 0;
@@ -1893,19 +2226,15 @@ function scoreMatch(ocrText, productName) {
     }
   }
 
-  const score = totalWeight
-    ? totalScore / totalWeight
-    : 0;
-
-  const coverage =
-    matchedTokens / productTokens.length;
+  const score = totalWeight ? totalScore / totalWeight : 0;
+  const coverage = matchedTokens / productTokens.length;
 
   const coverageBonus =
     coverage >= 0.75 ? 0.06 :
     coverage >= 0.50 ? 0.03 : 0;
 
   return {
-    score: Math.min(1, score + coverageBonus),
+    score:Math.min(1, score + coverageBonus),
     matchedTokens,
     coverage
   };
@@ -1913,30 +2242,23 @@ function scoreMatch(ocrText, productName) {
 
 function findMatches(ocrText) {
 
-  if (!ocrText || !products.length) {
-    return [];
-  }
+  if (!ocrText || !products.length) return [];
 
   const scored = products.map(product => {
 
-    const result = scoreMatch(
-      ocrText,
-      product.name
-    );
+    const result = scoreMatch(ocrText, product.name);
 
     return {
       product,
-      score: result.score,
-      matchedTokens: result.matchedTokens,
-      coverage: result.coverage
+      score:result.score,
+      matchedTokens:result.matchedTokens,
+      coverage:result.coverage
     };
   });
 
   scored.sort((a, b) => {
 
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
+    if (b.score !== a.score) return b.score - a.score;
 
     return b.coverage - a.coverage;
   });
@@ -1961,8 +2283,7 @@ function selectProduct(item, automatic = false) {
 
   selectedProduct = p;
 
-  $("productName").textContent =
-    p.name || "Product";
+  $("productName").textContent = p.name || "Product";
 
   $("mrp").textContent = formatMoney(p.MRP);
   $("dp").textContent = formatMoney(p.DP);
@@ -1973,8 +2294,7 @@ function selectProduct(item, automatic = false) {
       ? "Automatically selected match"
       : "Manually selected product") +
     " · Match score: " +
-    Math.round(item.score * 100) +
-    "%";
+    Math.round(item.score * 100) + "%";
 
   if (automatic) {
     $("choices").classList.remove("hidden");
@@ -2018,16 +2338,11 @@ function displayMatches(matches) {
   selectedProduct = null;
 
   $("addToCartBtn").classList.add("hidden");
-
   $("selectionNote").classList.add("hidden");
 
-  if (
-    !matches.length ||
-    matches[0].score < MIN_MATCH_THRESHOLD
-  ) {
+  if (!matches.length || matches[0].score < MIN_MATCH_THRESHOLD) {
 
-    $("productName").textContent =
-      "No clear product match";
+    $("productName").textContent = "No clear product match";
 
     $("mrp").textContent = "—";
     $("dp").textContent = "—";
@@ -2040,15 +2355,12 @@ function displayMatches(matches) {
 
     $("scanAgainBtn").classList.remove("hidden");
 
-    setStatus(
-      "No useful match found. Try capturing again."
-    );
+    setStatus("No useful match found. Try capturing again.");
 
     return;
   }
 
-  $("productName").textContent =
-    "Checking top product matches…";
+  $("productName").textContent = "Checking top product matches…";
 
   $("mrp").textContent = "—";
   $("dp").textContent = "—";
@@ -2064,8 +2376,7 @@ function displayMatches(matches) {
 
     button.innerHTML =
       "<strong>" +
-      (index + 1) +
-      ". " +
+      (index + 1) + ". " +
       escapeHtml(item.product.name) +
       "</strong><br>" +
       "<span style=\"color:#bce9cc;font-size:12px\">" +
@@ -2147,18 +2458,10 @@ function getPortraitCrop() {
   const cropH = visibleH * 0.36;
 
   return {
-    sx: Math.max(
-      0,
-      offsetX + (visibleW - cropW) / 2
-    ),
-
-    sy: Math.max(
-      0,
-      offsetY + (visibleH - cropH) / 2
-    ),
-
-    sw: Math.min(cropW, vw),
-    sh: Math.min(cropH, vh)
+    sx:Math.max(0, offsetX + (visibleW - cropW) / 2),
+    sy:Math.max(0, offsetY + (visibleH - cropH) / 2),
+    sw:Math.min(cropW, vw),
+    sh:Math.min(cropH, vh)
   };
 }
 
@@ -2170,19 +2473,11 @@ function createHighResolutionImage(crop) {
 
   const targetScale = Math.min(
     OCR_UPSCALE_FACTOR,
-    OCR_MAX_DIMENSION /
-      Math.max(crop.sw, crop.sh)
+    OCR_MAX_DIMENSION / Math.max(crop.sw, crop.sh)
   );
 
-  const width = Math.max(
-    1,
-    Math.round(crop.sw * targetScale)
-  );
-
-  const height = Math.max(
-    1,
-    Math.round(crop.sh * targetScale)
-  );
+  const width = Math.max(1, Math.round(crop.sw * targetScale));
+  const height = Math.max(1, Math.round(crop.sh * targetScale));
 
   const imageCanvas = document.createElement("canvas");
 
@@ -2190,7 +2485,7 @@ function createHighResolutionImage(crop) {
   imageCanvas.height = height;
 
   const imageCtx = imageCanvas.getContext("2d", {
-    willReadFrequently: true
+    willReadFrequently:true
   });
 
   imageCtx.imageSmoothingEnabled = true;
@@ -2223,20 +2518,16 @@ function createGrayscaleImage(source) {
   output.height = source.height;
 
   const octx = output.getContext("2d", {
-    willReadFrequently: true
+    willReadFrequently:true
   });
 
   octx.drawImage(source, 0, 0);
 
   const image = octx.getImageData(
-    0,
-    0,
-    output.width,
-    output.height
+    0, 0, output.width, output.height
   );
 
   const data = image.data;
-
   const contrast = 1.45;
   const brightness = 0;
 
@@ -2247,11 +2538,7 @@ function createGrayscaleImage(source) {
       0.587 * data[i + 1] +
       0.114 * data[i + 2];
 
-    gray =
-      (gray - 128) * contrast +
-      128 +
-      brightness;
-
+    gray = (gray - 128) * contrast + 128 + brightness;
     gray = Math.max(0, Math.min(255, gray));
 
     data[i] = gray;
@@ -2276,9 +2563,7 @@ function calculateOtsuThreshold(grayData) {
   let sum = 0;
 
   for (let i = 0; i < total; i++) {
-
     const value = grayData[i];
-
     histogram[value]++;
     sum += value;
   }
@@ -2294,15 +2579,13 @@ function calculateOtsuThreshold(grayData) {
 
     if (!weightBackground) continue;
 
-    const weightForeground =
-      total - weightBackground;
+    const weightForeground = total - weightBackground;
 
     if (!weightForeground) break;
 
     sumBackground += t * histogram[t];
 
-    const meanBackground =
-      sumBackground / weightBackground;
+    const meanBackground = sumBackground / weightBackground;
 
     const meanForeground =
       (sum - sumBackground) / weightForeground;
@@ -2310,13 +2593,9 @@ function calculateOtsuThreshold(grayData) {
     const variance =
       weightBackground *
       weightForeground *
-      Math.pow(
-        meanBackground - meanForeground,
-        2
-      );
+      Math.pow(meanBackground - meanForeground, 2);
 
     if (variance > maximumVariance) {
-
       maximumVariance = variance;
       threshold = t;
     }
@@ -2339,39 +2618,28 @@ function createBinaryImage(source) {
   output.height = source.height;
 
   const octx = output.getContext("2d", {
-    willReadFrequently: true
+    willReadFrequently:true
   });
 
   const image = grayCanvas.getContext("2d", {
-    willReadFrequently: true
+    willReadFrequently:true
   }).getImageData(
-    0,
-    0,
-    grayCanvas.width,
-    grayCanvas.height
+    0, 0, grayCanvas.width, grayCanvas.height
   );
 
   const data = image.data;
 
-  const grayValues = new Uint8Array(
-    data.length / 4
-  );
+  const grayValues = new Uint8Array(data.length / 4);
 
-  for (
-    let i = 0, j = 0;
-    i < data.length;
-    i += 4, j++
-  ) {
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     grayValues[j] = data[i];
   }
 
-  const threshold =
-    calculateOtsuThreshold(grayValues);
+  const threshold = calculateOtsuThreshold(grayValues);
 
   for (let i = 0; i < data.length; i += 4) {
 
-    const value =
-      data[i] >= threshold ? 255 : 0;
+    const value = data[i] >= threshold ? 255 : 0;
 
     data[i] = value;
     data[i + 1] = value;
@@ -2394,27 +2662,24 @@ async function runMultiPassOCR(sourceCanvas) {
     throw new Error("OCR engine is not ready.");
   }
 
-  const grayscaleCanvas =
-    createGrayscaleImage(sourceCanvas);
-
-  const binaryCanvas =
-    createBinaryImage(sourceCanvas);
+  const grayscaleCanvas = createGrayscaleImage(sourceCanvas);
+  const binaryCanvas = createBinaryImage(sourceCanvas);
 
   const passes = [
     {
-      image: sourceCanvas,
-      mode: "11",
-      label: "Detailed text detection"
+      image:sourceCanvas,
+      mode:"11",
+      label:"Detailed text detection"
     },
     {
-      image: grayscaleCanvas,
-      mode: "6",
-      label: "Grayscale text recognition"
+      image:grayscaleCanvas,
+      mode:"6",
+      label:"Grayscale text recognition"
     },
     {
-      image: binaryCanvas,
-      mode: "7",
-      label: "High-contrast text recognition"
+      image:binaryCanvas,
+      mode:"7",
+      label:"High-contrast text recognition"
     }
   ];
 
@@ -2426,30 +2691,20 @@ async function runMultiPassOCR(sourceCanvas) {
 
     setStatus(
       "Reading product text (" +
-      (i + 1) +
-      "/" +
-      passes.length +
-      "): " +
-      pass.label +
-      "…"
+      (i + 1) + "/" + passes.length + "): " +
+      pass.label + "…"
     );
 
     await worker.setParameters({
-
-      tessedit_pageseg_mode: pass.mode,
-
-      preserve_interword_spaces: "1",
-
-      user_defined_dpi: "300"
+      tessedit_pageseg_mode:pass.mode,
+      preserve_interword_spaces:"1",
+      user_defined_dpi:"300"
     });
 
     const result = await worker.recognize(pass.image);
-
     const text = result?.data?.text || "";
 
-    if (text.trim()) {
-      results.push(text);
-    }
+    if (text.trim()) results.push(text);
   }
 
   return results;
@@ -2491,9 +2746,7 @@ function combineOCRResults(results) {
 
 function frameIsStable() {
 
-  if (!video.videoWidth || !video.videoHeight) {
-    return null;
-  }
+  if (!video.videoWidth || !video.videoHeight) return null;
 
   const crop = getPortraitCrop();
 
@@ -2502,10 +2755,9 @@ function frameIsStable() {
   sample.width = 32;
   sample.height = 40;
 
-  const sctx = sample.getContext(
-    "2d",
-    { willReadFrequently: true }
-  );
+  const sctx = sample.getContext("2d", {
+    willReadFrequently:true
+  });
 
   sctx.drawImage(
     video,
@@ -2520,22 +2772,12 @@ function frameIsStable() {
   );
 
   const data = sctx.getImageData(
-    0,
-    0,
-    sample.width,
-    sample.height
+    0, 0, sample.width, sample.height
   ).data;
 
-  const gray = new Uint8Array(
-    sample.width * sample.height
-  );
+  const gray = new Uint8Array(sample.width * sample.height);
 
-  for (
-    let i = 0, j = 0;
-    i < data.length;
-    i += 4, j++
-  ) {
-
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     gray[j] = (
       data[i] * 0.299 +
       data[i + 1] * 0.587 +
@@ -2551,9 +2793,7 @@ function frameIsStable() {
   let diff = 0;
 
   for (let i = 0; i < gray.length; i++) {
-    diff += Math.abs(
-      gray[i] - lastFrameSample[i]
-    );
+    diff += Math.abs(gray[i] - lastFrameSample[i]);
   }
 
   diff /= gray.length;
@@ -2597,40 +2837,29 @@ async function captureAndRecognize(manual = false) {
 
     const crop = getPortraitCrop();
 
-    const sourceCanvas =
-      createHighResolutionImage(crop);
+    const sourceCanvas = createHighResolutionImage(crop);
 
     canvas.width = sourceCanvas.width;
     canvas.height = sourceCanvas.height;
 
     ctx.drawImage(sourceCanvas, 0, 0);
 
-    const ocrResults =
-      await runMultiPassOCR(sourceCanvas);
+    const ocrResults = await runMultiPassOCR(sourceCanvas);
 
-    if (
-      currentSession !== scanSession ||
-      !stream
-    ) {
-      return;
-    }
+    if (currentSession !== scanSession || !stream) return;
 
-    const recognizedText =
-      combineOCRResults(ocrResults);
+    const recognizedText = combineOCRResults(ocrResults);
 
     if (!recognizedText.trim()) {
 
-      $("productName").textContent =
-        "No text detected";
+      $("productName").textContent = "No text detected";
 
       $("matchMeta").textContent =
         "Move closer to the product name and improve lighting.";
 
       $("scanAgainBtn").classList.remove("hidden");
 
-      setStatus(
-        "OCR could not read the text. Try capturing again."
-      );
+      setStatus("OCR could not read the text. Try capturing again.");
 
       return;
     }
@@ -2691,9 +2920,7 @@ function monitorSteadiness() {
     }
 
     if (stableFrames >= 3) {
-
       stableFrames = 0;
-
       captureAndRecognize(false);
     }
 
@@ -2723,16 +2950,12 @@ async function startCamera() {
     if (!products.length) {
 
       if (!(await loadProducts())) {
-        throw new Error(
-          "Product database could not be loaded."
-        );
+        throw new Error("Product database could not be loaded.");
       }
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(
-        "Camera access unavailable. Use HTTPS."
-      );
+      throw new Error("Camera access unavailable. Use HTTPS.");
     }
 
     if (typeof Tesseract === "undefined") {
@@ -2741,51 +2964,34 @@ async function startCamera() {
       );
     }
 
-    setStatus(
-      "Starting camera and text recognition engine…"
-    );
+    setStatus("Starting camera and text recognition engine…");
 
-    const newStream =
-      await navigator.mediaDevices.getUserMedia({
+    const newStream = await navigator.mediaDevices.getUserMedia({
 
-        video: {
-          facingMode: {
-            ideal: "environment"
-          },
+      video: {
+        facingMode:{ ideal:"environment" },
+        width:{ ideal:1920 },
+        height:{ ideal:1080 }
+      },
 
-          width: {
-            ideal: 1920
-          },
-
-          height: {
-            ideal: 1080
-          }
-        },
-
-        audio: false
-      });
+      audio:false
+    });
 
     stream = newStream;
-
     video.srcObject = stream;
 
     await video.play();
 
     if (!worker) {
 
-      setStatus(
-        "Loading OCR recognition engine…"
-      );
+      setStatus("Loading OCR recognition engine…");
 
       worker = await Tesseract.createWorker("eng");
 
       await worker.setParameters({
-
-        tessedit_pageseg_mode: "11",
-
-        preserve_interword_spaces: "1",
-
-        user_defined_dpi: "300"
+        tessedit_pageseg_mode:"11",
+        preserve_interword_spaces:"1",
+        user_defined_dpi:"300"
       });
     }
 
@@ -2841,10 +3047,7 @@ function stopCamera(updateStatus = true) {
   clearAutoFinalizeTimer();
 
   if (stream) {
-
-    stream.getTracks().forEach(track => {
-      track.stop();
-    });
+    stream.getTracks().forEach(track => track.stop());
   }
 
   stream = null;
@@ -2903,15 +3106,9 @@ function scanAnotherProduct() {
 // EVENT LISTENERS
 // ==========================================
 
-$("startBtn").addEventListener(
-  "click",
-  startCamera
-);
+$("startBtn").addEventListener("click", startCamera);
 
-$("stopBtn").addEventListener(
-  "click",
-  () => stopCamera()
-);
+$("stopBtn").addEventListener("click", () => stopCamera());
 
 $("captureBtn").addEventListener(
   "click",
