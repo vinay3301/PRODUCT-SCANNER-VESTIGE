@@ -260,7 +260,7 @@ button:disabled {
 
 .hidden { display:none !important }
 
-/* CART */
+/* SHOPPING CART */
 
 .cart-section {
   margin-top:18px;
@@ -439,11 +439,23 @@ button:disabled {
   font-size:19px;
 }
 
+/* EXACT 2 x 2 CART BUTTON LAYOUT */
+
 .cart-actions {
   display:grid;
   grid-template-columns:1fr 1fr;
+  grid-template-rows:auto auto;
   gap:10px;
   margin-top:14px;
+}
+
+.cart-actions button {
+  width:100%;
+  min-width:0;
+  min-height:48px;
+  padding:11px 7px;
+  line-height:1.25;
+  font-size:13px;
 }
 
 .save-cart-btn {
@@ -462,8 +474,6 @@ button:disabled {
 }
 
 .clear-cart-btn {
-  width:100%;
-  margin-top:10px;
   background:#392321;
   color:#ffd2cc;
   border:1px solid #69413b;
@@ -515,7 +525,7 @@ button:disabled {
 
 .saved-cart-actions {
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:1fr 1fr 1fr;
   gap:8px;
   margin-top:10px;
 }
@@ -573,6 +583,11 @@ button:disabled {
   }
 
   .cart-actions { gap:8px }
+
+  .cart-actions button {
+    font-size:12px;
+    padding:10px 5px;
+  }
 }
 
 @media (max-width:350px) {
@@ -601,8 +616,20 @@ button:disabled {
 
   .quantity-value { min-width:18px }
 
-  .cart-actions { grid-template-columns:1fr }
-  .saved-cart-actions { grid-template-columns:1fr }
+  /* Keep the requested 2 x 2 layout even on narrow screens. */
+  .cart-actions {
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+  }
+
+  .cart-actions button {
+    font-size:11px;
+    padding:9px 3px;
+  }
+
+  .saved-cart-actions {
+    grid-template-columns:1fr;
+  }
 }
 </style>
 </head>
@@ -734,23 +761,27 @@ button:disabled {
       </div>
     </div>
 
+    <!-- BUTTONS IN THE REQUESTED 2 x 2 ORDER -->
+
     <div class="cart-actions">
+
       <button class="save-cart-btn" id="saveCartBtn" type="button" disabled>
-        Save Cart
+        SAVE CART
       </button>
 
       <button class="view-saved-btn" id="viewSavedBtn" type="button">
-        View Saved Carts
+        VIEW SAVED CARTS
       </button>
 
       <button class="export-cart-btn" id="exportCartBtn" type="button" disabled>
-        Export Cart Image
+        EXPORT CART
       </button>
-    </div>
 
-    <button class="clear-cart-btn hidden" id="clearCartBtn" type="button">
-      Clear Current Cart
-    </button>
+      <button class="clear-cart-btn" id="clearCartBtn" type="button" disabled>
+        CLEAR CURRENT CART
+      </button>
+
+    </div>
 
     <section class="saved-section hidden" id="savedSection">
       <div class="saved-heading">
@@ -811,7 +842,7 @@ const video = $("video");
 const canvas = $("canvas");
 
 const ctx = canvas.getContext("2d", {
-  willReadFrequently: true
+  willReadFrequently:true
 });
 
 // ==========================================
@@ -915,11 +946,11 @@ async function loadProducts() {
     try {
 
       const response = await fetch(API_URL, {
-        method: "GET",
-        mode: "cors",
-        cache: "no-store",
-        headers: {
-          "Accept": "application/json"
+        method:"GET",
+        mode:"cors",
+        cache:"no-store",
+        headers:{
+          "Accept":"application/json"
         }
       });
 
@@ -1004,15 +1035,15 @@ function formatMoney(value) {
   const n = numericValue(value);
 
   return "₹" + n.toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
+    minimumFractionDigits:0,
+    maximumFractionDigits:2
   });
 }
 
 function formatCartMoney(value) {
   return "₹" + Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
   });
 }
 
@@ -1040,11 +1071,11 @@ function escapeHtml(value) {
   return String(value).replace(
     /[&<>"']/g,
     c => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
     })[c]
   );
 }
@@ -1085,9 +1116,9 @@ function normalizeCartItem(item) {
   if (!Number.isFinite(quantity)) return null;
 
   return {
-    key: String(item.key || normalizeText(item.product.name)),
-    product: item.product,
-    quantity: Math.floor(quantity)
+    key:String(item.key || normalizeText(item.product.name)),
+    product:item.product,
+    quantity:Math.floor(quantity)
   };
 }
 
@@ -1204,13 +1235,13 @@ function addSelectedProductToCart() {
   } else {
     cart.push({
       key,
-      product: {
-        name: product.name,
-        MRP: product.MRP,
-        DP: product.DP,
-        pv: product.pv
+      product:{
+        name:product.name,
+        MRP:product.MRP,
+        DP:product.DP,
+        pv:product.pv
       },
-      quantity: 1
+      quantity:1
     });
   }
 
@@ -1227,8 +1258,7 @@ function addSelectedProductToCart() {
 
   $("selectionNote").classList.remove("hidden");
 
-  // FEATURE 1:
-  // Remove all five suggestions after adding a product.
+  // Clear the top-five suggestions after adding.
   $("choices").innerHTML = "";
   $("choices").classList.add("hidden");
 
@@ -1248,7 +1278,7 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
-  // Keep zero and negative quantities in the cart.
+  // Zero and negative quantities are retained.
   // They remain faded and are excluded from totals.
 
   item.quantity += change;
@@ -1298,21 +1328,21 @@ function saveCurrentCart() {
   const name = enteredName || defaultName;
 
   const snapshot = {
-    id: (
+    id:(
       Date.now().toString(36) +
       Math.random().toString(36).slice(2, 8)
     ),
     name,
-    savedAt: new Date().toISOString(),
-    cart: cart.map(item => ({
-      key: item.key,
-      product: {
-        name: item.product.name,
-        MRP: item.product.MRP,
-        DP: item.product.DP,
-        pv: item.product.pv
+    savedAt:new Date().toISOString(),
+    cart:cart.map(item => ({
+      key:item.key,
+      product:{
+        name:item.product.name,
+        MRP:item.product.MRP,
+        DP:item.product.DP,
+        pv:item.product.pv
       },
-      quantity: item.quantity
+      quantity:item.quantity
     }))
   };
 
@@ -1351,8 +1381,6 @@ function loadSavedCart(id) {
     if (!confirmed) return;
   }
 
-  // Preserve zero and negative quantities.
-
   cart = saved.cart.map(normalizeCartItem).filter(Boolean);
   cartName = saved.name;
 
@@ -1372,7 +1400,7 @@ function loadSavedCart(id) {
 }
 
 // ==========================================
-// FEATURE 2: DELETE SAVED CART
+// DELETE SAVED CART
 // ==========================================
 
 function deleteSavedCart(id) {
@@ -1394,6 +1422,7 @@ function deleteSavedCart(id) {
 
   if (!saveSavedCartsToStorage()) {
     savedCarts = previous;
+    renderSavedCarts();
     return;
   }
 
@@ -1584,10 +1613,10 @@ function renderCart() {
 
   $("cartEmpty").classList.toggle("hidden", hasItems);
   $("cartSummary").classList.toggle("hidden", !hasItems);
-  $("clearCartBtn").classList.toggle("hidden", !hasItems);
 
   $("saveCartBtn").disabled = !hasItems;
   $("exportCartBtn").disabled = !hasItems;
+  $("clearCartBtn").disabled = !hasItems;
 
   $("cartCount").textContent =
     totals.totalQuantity +
@@ -1604,12 +1633,12 @@ function renderCart() {
 
   $("totalPV").textContent =
     totals.totalPV.toLocaleString("en-IN", {
-      maximumFractionDigits: 2
+      maximumFractionDigits:2
     });
 }
 
 // ==========================================
-// FEATURE 3: CREATE CART IMAGE
+// IMAGE DRAWING HELPERS
 // ==========================================
 
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -1629,7 +1658,7 @@ function roundedRect(ctx, x, y, width, height, radius) {
 
 function wrapCanvasText(ctx, text, maxWidth) {
 
-  const words = String(text).split(/\s+/);
+  const words = String(text || "").split(/\s+/);
   const lines = [];
   let line = "";
 
@@ -1647,8 +1676,20 @@ function wrapCanvasText(ctx, text, maxWidth) {
 
   if (line) lines.push(line);
 
-  return lines;
+  return lines.length ? lines : [""];
 }
+
+function drawTextLines(ctx, lines, x, y, lineHeight) {
+
+  lines.forEach((line, index) => {
+    ctx.fillText(line, x, y + index * lineHeight);
+  });
+}
+
+// ==========================================
+// CREATE SHOPPING CART IMAGE
+// Styled to resemble the webpage cart section
+// ==========================================
 
 function createCartImage(cartData) {
 
@@ -1656,38 +1697,38 @@ function createCartImage(cartData) {
 
     try {
 
-      const items = cartData.cart || [];
+      const items = Array.isArray(cartData.cart)
+        ? cartData.cart
+        : [];
+
       const totals = calculateCartTotals(items);
 
-      const width = 1000;
-      const padding = 55;
+      const width = 900;
+      const padding = 42;
       const contentWidth = width - padding * 2;
 
       const rowLayouts = [];
 
-      const tempCanvas = document.createElement("canvas");
-      const tempCtx = tempCanvas.getContext("2d");
+      const measureCanvas = document.createElement("canvas");
+      const measureCtx = measureCanvas.getContext("2d");
 
-      tempCtx.font = "bold 27px Arial";
+      const nameFont = "bold 25px Arial";
+      const detailFont = "19px Arial";
 
-      let totalHeight = 0;
-
+      // Calculate each cart row's height based on product name.
       items.forEach(item => {
 
-        const quantity = Number(item.quantity);
-        const productName = String(item.product.name || "Product");
-
-        tempCtx.font = "bold 27px Arial";
+        measureCtx.font = nameFont;
 
         const nameLines = wrapCanvasText(
-          tempCtx,
-          productName,
-          560
+          measureCtx,
+          item.product?.name || "Product",
+          540
         );
 
         const rowHeight = Math.max(
-          100,
-          42 + nameLines.length * 34
+          105,
+          43 + nameLines.length * 32 + 30
         );
 
         rowLayouts.push({
@@ -1695,22 +1736,28 @@ function createCartImage(cartData) {
           nameLines,
           rowHeight
         });
-
-        totalHeight += rowHeight + 14;
       });
 
-      const headerHeight = 230;
-      const summaryHeight = 250;
-      const footerHeight = 100;
+      const headerHeight = 190;
+      const cartHeadingHeight = 85;
+      const rowGap = 12;
+      const rowsHeight = rowLayouts.reduce(
+        (sum, row) => sum + row.rowHeight + rowGap,
+        0
+      );
 
-      const height = Math.max(
-        650,
+      const summaryHeight = 260;
+      const footerHeight = 75;
+
+      const height =
         padding +
         headerHeight +
-        totalHeight +
+        cartHeadingHeight +
+        rowsHeight +
+        25 +
         summaryHeight +
-        footerHeight
-      );
+        footerHeight +
+        padding;
 
       const output = document.createElement("canvas");
 
@@ -1719,66 +1766,95 @@ function createCartImage(cartData) {
 
       const c = output.getContext("2d");
 
-      // Background
+      // Background matches the webpage.
       c.fillStyle = "#08130e";
       c.fillRect(0, 0, width, height);
 
-      // Header
-      c.fillStyle = "#123b2a";
-      roundedRect(c, padding, padding, contentWidth, 175, 25);
+      // Main cart header.
+      c.fillStyle = "#11251a";
+      roundedRect(
+        c,
+        padding,
+        padding,
+        contentWidth,
+        headerHeight,
+        22
+      );
       c.fill();
 
+      c.strokeStyle = "#294536";
+      c.lineWidth = 2;
+      c.stroke();
+
       c.fillStyle = "#70d69b";
-      c.font = "bold 38px Arial";
-      c.fillText("PRODUCT CART", padding + 30, padding + 55);
+      c.font = "bold 32px Arial";
+      c.fillText("🛒 SHOPPING CART", padding + 25, padding + 48);
+
+      // Cart/customer name.
+      const cartTitle = String(
+        cartData.name || "Shopping Cart"
+      );
 
       c.fillStyle = "#ffffff";
-      c.font = "bold 34px Arial";
+      c.font = "bold 29px Arial";
 
       const titleLines = wrapCanvasText(
         c,
-        cartData.name || "Shopping Cart",
-        contentWidth - 60
+        cartTitle,
+        contentWidth - 50
       );
 
-      c.fillText(
-        titleLines[0] || "Shopping Cart",
-        padding + 30,
-        padding + 105
+      drawTextLines(
+        c,
+        titleLines.slice(0, 2),
+        padding + 25,
+        padding + 95,
+        34
       );
 
-      c.fillStyle = "#c5d8cb";
-      c.font = "20px Arial";
-
+      // Date and time.
       const dateText = cartData.savedAt
         ? new Date(cartData.savedAt).toLocaleString("en-IN")
         : new Date().toLocaleString("en-IN");
 
-      c.fillText(dateText, padding + 30, padding + 145);
+      c.fillStyle = "#a8b9ae";
+      c.font = "17px Arial";
+      c.fillText(dateText, padding + 25, padding + 160);
 
-      // Column headings
-      let y = padding + headerHeight;
+      // Cart section heading and item count.
+      let y = padding + headerHeight + 48;
 
-      c.fillStyle = "#70d69b";
-      c.font = "bold 21px Arial";
+      c.fillStyle = "#ffffff";
+      c.font = "bold 27px Arial";
+      c.fillText("Your Products", padding + 5, y);
 
-      c.fillText("PRODUCT", padding + 15, y);
-      c.fillText("QTY", 700, y);
-      c.fillText("DP", 800, y);
-      c.fillText("PV", 900, y);
+      c.fillStyle = "#bce9cc";
+      c.font = "bold 19px Arial";
 
-      y += 22;
+      const itemCountText =
+        totals.totalQuantity + " items";
 
-      // Product rows
-      rowLayouts.forEach((layout, index) => {
+      const countWidth = c.measureText(itemCountText).width;
+
+      c.fillText(
+        itemCountText,
+        width - padding - countWidth - 5,
+        y
+      );
+
+      y += 28;
+
+      // Draw cart product rows in the same visual style as webpage.
+      rowLayouts.forEach(layout => {
 
         const item = layout.item;
         const quantity = Number(item.quantity);
         const active = quantity > 0;
 
-        y += 12;
+        y += 10;
 
-        c.fillStyle = active ? "#173323" : "#202923";
+        // Product row background.
+        c.fillStyle = active ? "#1a3324" : "#202923";
 
         roundedRect(
           c,
@@ -1791,88 +1867,235 @@ function createCartImage(cartData) {
 
         c.fill();
 
-        c.globalAlpha = active ? 1 : 0.45;
+        c.strokeStyle = active ? "#294536" : "#26372c";
+        c.lineWidth = 1.5;
+        c.stroke();
 
-        c.fillStyle = "#ffffff";
-        c.font = "bold 27px Arial";
-
-        let nameY = y + 38;
-
-        layout.nameLines.forEach(line => {
-          c.fillText(line, padding + 20, nameY);
-          nameY += 34;
-        });
-
-        c.font = "22px Arial";
-        c.fillStyle = "#c5d8cb";
-
-        c.fillText(String(quantity), 700, y + 43);
-
-        c.fillText(
-          formatCartMoney(numericValue(item.product.DP)),
-          800,
-          y + 43
-        );
-
-        c.fillText(
-          String(item.product.pv ?? "—"),
-          900,
-          y + 43
-        );
+        c.save();
 
         if (!active) {
-          c.font = "italic 16px Arial";
-          c.fillStyle = "#f0b6a9";
-          c.fillText("Excluded from totals", padding + 20, y + layout.rowHeight - 12);
+          c.globalAlpha = 0.42;
         }
 
-        c.globalAlpha = 1;
+        // Product name.
+        c.fillStyle = "#ffffff";
+        c.font = nameFont;
 
-        y += layout.rowHeight;
+        drawTextLines(
+          c,
+          layout.nameLines,
+          padding + 19,
+          y + 35,
+          32
+        );
+
+        // DP and PV details, matching webpage placement.
+        const detailY =
+          y + 43 + layout.nameLines.length * 32;
+
+        c.fillStyle = "#a8b9ae";
+        c.font = detailFont;
+
+        c.fillText(
+          "DP: " + formatMoney(item.product?.DP),
+          padding + 20,
+          detailY
+        );
+
+        c.fillText(
+          "PV: " + String(item.product?.pv ?? "—"),
+          padding + 220,
+          detailY
+        );
+
+        // Quantity control visual, similar to webpage.
+        const controlWidth = 145;
+        const controlHeight = 49;
+        const controlX = width - padding - controlWidth - 15;
+        const controlY = y + (layout.rowHeight - controlHeight) / 2;
+
+        c.fillStyle = "#0c2014";
+
+        roundedRect(
+          c,
+          controlX,
+          controlY,
+          controlWidth,
+          controlHeight,
+          10
+        );
+
+        c.fill();
+
+        // Minus box.
+        c.fillStyle = "#294936";
+
+        roundedRect(
+          c,
+          controlX + 7,
+          controlY + 7,
+          35,
+          35,
+          7
+        );
+
+        c.fill();
+
+        c.fillStyle = "#ffffff";
+        c.font = "bold 25px Arial";
+        c.textAlign = "center";
+        c.fillText("−", controlX + 24, controlY + 33);
+
+        // Quantity.
+        c.fillStyle = "#ffffff";
+        c.font = "bold 22px Arial";
+        c.textAlign = "center";
+        c.fillText(
+          String(quantity),
+          controlX + 72,
+          controlY + 32
+        );
+
+        // Plus box.
+        c.fillStyle = "#294936";
+
+        roundedRect(
+          c,
+          controlX + 103,
+          controlY + 7,
+          35,
+          35,
+          7
+        );
+
+        c.fill();
+
+        c.fillStyle = "#ffffff";
+        c.font = "bold 25px Arial";
+        c.textAlign = "center";
+        c.fillText("+", controlX + 120, controlY + 33);
+
+        c.textAlign = "left";
+
+        if (!active) {
+          c.fillStyle = "#f0b6a9";
+          c.font = "italic 15px Arial";
+          c.fillText(
+            "Excluded from totals",
+            padding + 20,
+            y + layout.rowHeight - 10
+          );
+        }
+
+        c.restore();
+
+        y += layout.rowHeight + rowGap;
       });
 
-      // Summary card
-      y += 28;
+      // Cart summary panel, matching webpage.
+      y += 10;
 
-      c.fillStyle = "#123b2a";
-      roundedRect(c, padding, y, contentWidth, summaryHeight - 20, 20);
+      c.fillStyle = "#0b1d12";
+
+      roundedRect(
+        c,
+        padding,
+        y,
+        contentWidth,
+        summaryHeight,
+        16
+      );
+
       c.fill();
 
-      c.fillStyle = "#70d69b";
-      c.font = "bold 29px Arial";
-      c.fillText("CART SUMMARY", padding + 25, y + 48);
+      c.strokeStyle = "#294536";
+      c.lineWidth = 2;
+      c.stroke();
 
       c.fillStyle = "#ffffff";
-      c.font = "24px Arial";
+      c.font = "bold 25px Arial";
+      c.fillText("Cart Summary", padding + 22, y + 43);
 
+      // Total products.
+      c.fillStyle = "#c5d8cb";
+      c.font = "20px Arial";
+      c.fillText("Total products", padding + 22, y + 88);
+
+      c.fillStyle = "#ffffff";
+      c.font = "bold 21px Arial";
+      c.textAlign = "right";
       c.fillText(
-        "Active product types: " + totals.activeItems.length,
-        padding + 25,
-        y + 95
+        String(totals.activeItems.length),
+        width - padding - 22,
+        y + 88
       );
 
+      // Total quantity.
+      c.textAlign = "left";
+      c.fillStyle = "#c5d8cb";
+      c.font = "20px Arial";
+      c.fillText("Total quantity", padding + 22, y + 128);
+
+      c.fillStyle = "#ffffff";
+      c.font = "bold 21px Arial";
+      c.textAlign = "right";
       c.fillText(
-        "Active quantity: " + totals.totalQuantity,
-        padding + 25,
-        y + 135
+        String(totals.totalQuantity),
+        width - padding - 22,
+        y + 128
       );
 
+      // Separator.
+      c.beginPath();
+      c.moveTo(padding + 20, y + 150);
+      c.lineTo(width - padding - 20, y + 150);
+      c.strokeStyle = "#294536";
+      c.lineWidth = 1.5;
+      c.stroke();
+
+      // Total DP.
+      c.textAlign = "left";
+      c.fillStyle = "#c5d8cb";
+      c.font = "bold 21px Arial";
+      c.fillText("Total DP", padding + 22, y + 190);
+
+      c.fillStyle = "#70d69b";
+      c.font = "bold 26px Arial";
+      c.textAlign = "right";
       c.fillText(
-        "Total DP: " + formatCartMoney(totals.totalDP),
-        padding + 25,
-        y + 175
+        formatCartMoney(totals.totalDP),
+        width - padding - 22,
+        y + 190
       );
 
+      // Total PV.
+      c.textAlign = "left";
+      c.fillStyle = "#c5d8cb";
+      c.font = "20px Arial";
+      c.fillText("Total PV", padding + 22, y + 225);
+
+      c.fillStyle = "#ffffff";
+      c.font = "bold 21px Arial";
+      c.textAlign = "right";
       c.fillText(
-        "Total PV: " + totals.totalPV.toLocaleString("en-IN"),
-        padding + 500,
-        y + 175
+        totals.totalPV.toLocaleString("en-IN", {
+          maximumFractionDigits:2
+        }),
+        width - padding - 22,
+        y + 225
       );
 
-      // Footer
-      c.fillStyle = "#a8b9ae";
-      c.font = "18px Arial";
-      c.fillText("Generated by Product Scanner", padding, height - 45);
+      // Footer.
+      c.textAlign = "center";
+      c.fillStyle = "#83988a";
+      c.font = "16px Arial";
+      c.fillText(
+        "Generated by Product Scanner",
+        width / 2,
+        height - 32
+      );
+
+      c.textAlign = "left";
 
       output.toBlob(blob => {
 
@@ -1899,11 +2122,11 @@ async function exportCartAsImage(cartData) {
 
   try {
 
-    setStatus("Preparing cart image…");
+    setStatus("Preparing Shopping Cart image…");
 
     const blob = await createCartImage(cartData);
 
-    const safeName = String(cartData.name || "cart")
+    const safeName = String(cartData.name || "shopping_cart")
       .replace(/[^a-z0-9-_]/gi, "_")
       .slice(0, 50);
 
@@ -1912,34 +2135,35 @@ async function exportCartAsImage(cartData) {
     const file = new File(
       [blob],
       fileName,
-      { type:"image/png" }
+      {type:"image/png"}
     );
 
-    const shareText =
-      "Cart: " + (cartData.name || "Shopping Cart") +
-      "\nTotal DP: " +
-      formatCartMoney(calculateCartTotals(cartData.cart).totalDP) +
-      "\nTotal PV: " +
-      calculateCartTotals(cartData.cart).totalPV;
+    const totals = calculateCartTotals(cartData.cart);
 
-    // Prefer native sharing with image attachment.
+    const shareText =
+      "Shopping Cart: " + (cartData.name || "Shopping Cart") +
+      "\nTotal quantity: " + totals.totalQuantity +
+      "\nTotal DP: " + formatCartMoney(totals.totalDP) +
+      "\nTotal PV: " + totals.totalPV;
+
+    // Use Android's native share sheet when image sharing is supported.
     if (
       navigator.share &&
       navigator.canShare &&
-      navigator.canShare({ files:[file] })
+      navigator.canShare({files:[file]})
     ) {
 
       await navigator.share({
-        title: cartData.name || "Shopping Cart",
-        text: shareText,
+        title:cartData.name || "Shopping Cart",
+        text:shareText,
         files:[file]
       });
 
-      setStatus("Cart image shared successfully.");
+      setStatus("Shopping Cart image shared successfully.");
       return;
     }
 
-    // Fallback: download the image.
+    // Fallback: download the PNG image.
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -1953,13 +2177,12 @@ async function exportCartAsImage(cartData) {
 
     setTimeout(() => URL.revokeObjectURL(url), 30000);
 
-    // Offer WhatsApp text sharing as an additional fallback.
     const shareTextUrl =
       "https://wa.me/?text=" +
       encodeURIComponent(shareText);
 
     const openWhatsApp = confirm(
-      "Your cart image has been downloaded. " +
+      "Your Shopping Cart image has been downloaded. " +
       "Your browser does not support direct image sharing here. " +
       "Would you also like to open WhatsApp with the cart details?"
     );
@@ -1969,7 +2192,7 @@ async function exportCartAsImage(cartData) {
     }
 
     setStatus(
-      "Cart image downloaded. You can attach it in WhatsApp or another app."
+      "Shopping Cart image downloaded. You can attach it in WhatsApp or another app."
     );
 
   } catch (error) {
@@ -2005,12 +2228,12 @@ function exportCurrentCart() {
   }
 
   const data = {
-    name: cartName.trim() || "Shopping Cart",
-    savedAt: new Date().toISOString(),
-    cart: cart.map(item => ({
-      key: item.key,
-      product: { ...item.product },
-      quantity: item.quantity
+    name:cartName.trim() || "Shopping Cart",
+    savedAt:new Date().toISOString(),
+    cart:cart.map(item => ({
+      key:item.key,
+      product:{...item.product},
+      quantity:item.quantity
     }))
   };
 
@@ -2134,7 +2357,7 @@ function levenshtein(a, b) {
   }
 
   let previous = Array.from(
-    { length: b.length + 1 },
+    {length:b.length + 1},
     (_, i) => i
   );
 
@@ -2194,7 +2417,7 @@ function scoreMatch(ocrText, productName) {
   const productTokens = [...new Set(getTokens(productName))];
 
   if (!ocrTokens.length || !productTokens.length) {
-    return { score:0, matchedTokens:0, coverage:0 };
+    return {score:0, matchedTokens:0, coverage:0};
   }
 
   let totalScore = 0;
@@ -2968,10 +3191,10 @@ async function startCamera() {
 
     const newStream = await navigator.mediaDevices.getUserMedia({
 
-      video: {
-        facingMode:{ ideal:"environment" },
-        width:{ ideal:1920 },
-        height:{ ideal:1080 }
+      video:{
+        facingMode:{ideal:"environment"},
+        width:{ideal:1920},
+        height:{ideal:1080}
       },
 
       audio:false
