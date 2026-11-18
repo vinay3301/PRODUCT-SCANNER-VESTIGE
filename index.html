@@ -16,8 +16,8 @@
     .sub { color:var(--muted); font-size:12px; margin-top:3px }
     main { max-width:760px; margin:auto; padding:0 12px 28px; }
     .camera-wrap { position:relative; background:#000; border:1px solid var(--line); border-radius:18px; overflow:hidden; min-height:240px; }
-    video { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; }
-    .scan-frame { pointer-events:none; position:absolute; left:12%; top:19%; width:76%; height:54%; border:2px solid rgba(112,214,155,.9); border-radius:14px; box-shadow:0 0 0 999px rgba(0,0,0,.18); }
+    video { display:block; width:100%; aspect-ratio:3/4; max-height:68vh; object-fit:cover; background:#000; }
+    .scan-frame { pointer-events:none; position:absolute; left:19%; top:10%; width:62%; height:78%; border:2px solid rgba(112,214,155,.95); border-radius:18px; box-shadow:0 0 0 999px rgba(0,0,0,.24); }
     .scan-hint { position:absolute; bottom:12px; left:12px; right:12px; text-align:center; background:#06100bd9; padding:8px; border-radius:10px; font-size:12px; color:#d7e9de; }
     .controls { display:flex; gap:10px; margin:12px 0; }
     button { border:0; border-radius:12px; padding:13px 16px; font-weight:700; font-size:14px; cursor:pointer; }
@@ -49,7 +49,7 @@
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
     <div class="scan-frame"></div>
-    <div class="scan-hint">Keep the product name and size inside the frame</div>
+    <div class="scan-hint">Center the product vertically; keep its main name inside the frame</div>
   </section>
   <div class="controls">
     <button class="primary" id="startBtn">Start camera</button>
@@ -66,7 +66,7 @@
     <div class="match-meta" id="matchMeta">Product details will appear here when a confident match is found.</div>
     <div class="choices hidden" id="choices"></div>
   </section>
-  <p class="foot">For best results, use bright light, hold the phone steady, and show the product name and pack size. Recognition uses text on the packaging; it may not identify a product if the label is hidden, blurry, or curved away from the camera.</p>
+  <p class="foot">Portrait-first scanning: keep the main product name facing the camera and inside the frame. The scanner automatically crops the central label area, prioritizes the main name, and uses pack details only to distinguish similar products. Very blurry or hidden text may still need another scan.</p>
 </main>
 <canvas id="canvas" class="hidden"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -78,6 +78,8 @@
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
   let products = [], stream = null, worker = null, scanTimer = null, busy = false;
   let lastCandidate = "", repeatCount = 0;
+  let lastFrameSample = null, unstableFrames = 0, failedScans = 0;
+  let lastDisplayedProduct = "";
 
   function setStatus(message) { $("status").textContent = message; }
 
@@ -200,31 +202,125 @@
     showProduct(best.p, best.score, false);
     setStatus("Product identified. Keep scanning or point at another product.");
   }
+  // Map the portrait scan window shown on screen back to the real camera pixels.
+  // This accounts for object-fit: cover, including phones whose camera stream is landscape.
+  function getPortraitCrop() {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const rect = video.getBoundingClientRect();
+    const scale = Math.max(rect.width / vw, rect.height / vh);
+    const visibleW = rect.width / scale;
+    const visibleH = rect.height / scale;
+    const offsetX = (vw - visibleW) / 2;
+    const offsetY = (vh - visibleH) / 2;
+    // Wider than the visible guide to avoid clipping long product names.
+    const cropW = visibleW * 0.78;
+    const cropH = visibleH * 0.90;
+    return {
+      sx: Math.max(0, offsetX + (visibleW - cropW) / 2),
+      sy: Math.max(0, offsetY + (visibleH - cropH) / 2),
+      sw: Math.min(cropW, vw), sh: Math.min(cropH, vh)
+    };
+  }
+
+  // Cheap low-resolution motion estimate. Skip frames while the phone is moving quickly.
+  function frameIsStable() {
+    const sample = document.createElement("canvas");
+    sample.width = 32; sample.height = 40;
+    const sctx = sample.getContext("2d", { willReadFrequently: true });
+    sctx.drawImage(video, 0, 0, sample.width, sample.height);
+    const data = sctx.getImageData(0, 0, sample.width, sample.height).data;
+    const gray = new Uint8Array(sample.width * sample.height);
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      gray[p] = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
+    }
+    if (!lastFrameSample) { lastFrameSample = gray; return true; }
+    let diff = 0;
+    for (let i = 0; i < gray.length; i++) diff += Math.abs(gray[i] - lastFrameSample[i]);
+    diff /= gray.length;
+    lastFrameSample = gray;
+    if (diff > 24) { unstableFrames++; return false; }
+    unstableFrames = 0;
+    return true;
+  }
+
+  // Prioritize larger, more prominent text lines as the likely product name.
+  function getNameFirstText(data) {
+    const lines = Array.isArray(data.lines) ? data.lines : [];
+    const ranked = lines.map(line => {
+      const box = line.bbox || {};
+      const height = Math.max(0, (box.y1 || 0) - (box.y0 || 0));
+      const text = String(line.text || "").trim();
+      const letters = (text.match(/[A-Za-z]/g) || []).length;
+      return { text, height, letters };
+    }).filter(x => x.text && x.letters >= 3)
+      .sort((a, b) => (b.height * Math.min(b.letters, 24)) - (a.height * Math.min(a.letters, 24)));
+    return ranked.slice(0, 5).map(x => x.text).join(" ");
+  }
+
   async function scanFrame() {
     if (busy || !worker || !stream || video.readyState < 2) return;
     busy = true;
     try {
-      const width = video.videoWidth, height = video.videoHeight;
-      if (!width || !height) return;
-      const cropW = Math.round(width * 0.78), cropH = Math.round(height * 0.58);
-      const sx = Math.round((width - cropW) / 2), sy = Math.round((height - cropH) / 2);
-      const scale = Math.min(1, 1000 / cropW);
-      canvas.width = Math.max(1, Math.round(cropW * scale));
-      canvas.height = Math.max(1, Math.round(cropH * scale));
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      if (!frameIsStable()) {
+        setStatus("Hold steady… waiting for a clearer frame.");
+        return;
+      }
+      const crop = getPortraitCrop();
+      const scale = Math.min(1, 1050 / Math.max(crop.sw, crop.sh));
+      canvas.width = Math.max(1, Math.round(crop.sw * scale));
+      canvas.height = Math.max(1, Math.round(crop.sh * scale));
+      ctx.filter = "none";
+      ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
+
       const result = await worker.recognize(canvas);
-      const matches = findMatches(result.data.text || "");
-      const best = matches[0];
+      const data = result.data || {};
+      const mainText = getNameFirstText(data);
+      const allText = String(data.text || "");
+      let matches = findMatches(mainText || allText);
+      let best = matches[0];
+
+      // Use the complete OCR text only as a fallback or to resolve similar variants.
+      if (!best || best.score < 0.48 || best.matched < 2) {
+        const fullMatches = findMatches(allText);
+        if (fullMatches[0] && (!best || fullMatches[0].score > best.score + 0.04)) {
+          matches = fullMatches;
+          best = matches[0];
+        }
+      }
+
       if (best && best.score >= 0.42 && (best.matched >= 2 || best.score >= 0.78)) {
+        failedScans = 0;
         const key = normalize(best.p.name);
         if (key === lastCandidate) repeatCount++;
         else { lastCandidate = key; repeatCount = 1; }
-        if (repeatCount >= 2) displayMatches(matches);
-        else setStatus("Reading label… hold steady for another moment.");
+        if (repeatCount >= 2) {
+          displayMatches(matches);
+          lastDisplayedProduct = key;
+        } else {
+          setStatus("Product name detected… confirming on the next steady frame.");
+        }
       } else {
         lastCandidate = "";
         repeatCount = 0;
-        setStatus("Reading packaging… keep the product name inside the frame.");
+        failedScans++;
+        // Retry a difficult frame with grayscale/contrast enhancement, not on every frame.
+        if (failedScans % 3 === 0) {
+          ctx.filter = "grayscale(1) contrast(1.35) brightness(1.08)";
+          ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
+          const enhanced = await worker.recognize(canvas);
+          const enhancedText = getNameFirstText(enhanced.data || {}) || String(enhanced.data?.text || "");
+          const enhancedMatches = findMatches(enhancedText);
+          if (enhancedMatches[0] && enhancedMatches[0].score >= 0.52 && enhancedMatches[0].matched >= 2) {
+            lastCandidate = normalize(enhancedMatches[0].p.name);
+            repeatCount = 1;
+            setStatus("Enhanced text found… hold steady for confirmation.");
+          } else {
+            setStatus("Name not clear yet. Move slightly closer or improve the light.");
+          }
+          ctx.filter = "none";
+        } else {
+          setStatus("Looking for the main product name… keep it centered in the frame.");
+        }
       }
     } catch (error) {
       setStatus("Scanning issue: " + error.message);
@@ -248,8 +344,21 @@
       $("startBtn").disabled = true;
       $("stopBtn").disabled = false;
       setStatus("Loading text recognition… this may take a little time the first time.");
-      if (!worker) worker = await Tesseract.createWorker("eng");
-      setStatus("Camera ready. Checking for a new frame every 0.5 seconds; OCR runs sequentially.");
+      if (!worker) {
+        worker = await Tesseract.createWorker("eng");
+        // Sparse-text mode works well for labels with separated words and lines.
+        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+      }
+      // Request continuous autofocus when the Android browser exposes this capability.
+      try {
+        const track = stream.getVideoTracks()[0];
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.focusMode && caps.focusMode.includes("continuous")) {
+          await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+        }
+      } catch (focusError) { console.debug("Continuous autofocus constraint unavailable:", focusError); }
+      lastFrameSample = null; unstableFrames = 0; failedScans = 0;
+      setStatus("Camera ready. Center the product name in the tall frame.");
       scanTimer = setInterval(scanFrame, 500);
     } catch (error) {
       setStatus("Could not start camera: " + error.message + ". Open this app over HTTPS and allow camera access.");
@@ -262,10 +371,24 @@
     if (stream) stream.getTracks().forEach(track => track.stop());
     stream = null;
     video.srcObject = null;
+    lastFrameSample = null; lastCandidate = ""; repeatCount = 0;
     $("startBtn").disabled = false;
     $("stopBtn").disabled = true;
     if (updateStatus) setStatus("Camera stopped. Text recognition remains ready for the next scan.");
   }
+  video.addEventListener("click", async () => {
+    if (!stream) return;
+    try {
+      const track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.focusMode && caps.focusMode.includes("single-shot")) {
+        await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
+        setStatus("Focusing on the product…");
+      } else {
+        setStatus("Keep the product name centered; the camera will autofocus when supported.");
+      }
+    } catch (e) { console.debug("Tap focus unavailable:", e); }
+  });
   $("startBtn").addEventListener("click", startCamera);
   $("stopBtn").addEventListener("click", () => stopCamera());
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
