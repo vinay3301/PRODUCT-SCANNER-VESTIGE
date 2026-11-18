@@ -4,12 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123b2a">
-  <meta name="description" content="Fast camera-based product information scanner using RapidOCR & RapidFuzz">
+  <meta name="description" content="Fast camera-based product information scanner">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>Product Scanner - Fast OCR</title>
-  <!-- Load RapidOCR ONNX runtime and RapidFuzz browser builds -->
-  <script src="https://cdn.jsdelivr.net/npm/@rapidocr/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/rapidocr-web@1.0.0/dist/rapidocr.min.js"></script>
+  <title>Product Scanner - Fast Match</title>
+  <!-- Load Tesseract.js and RapidFuzz via stable CDN script tags -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/rapidfuzz@3.9.0/dist/rapidfuzz.umd.min.js"></script>
   <style>
     :root { color-scheme:dark; --bg:#08130e; --panel:#11251a; --green:#70d69b; --muted:#a8b9ae; --line:#294536; }
@@ -49,7 +48,7 @@
 </head>
 <body>
 <header>
-  <div><h1>Product Scanner</h1><div class="sub">Fast mobile OCR · RapidOCR + Fuzzy Match</div></div>
+  <div><h1>Product Scanner</h1><div class="sub">Optimized Tesseract + RapidFuzz</div></div>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
 <main>
@@ -78,7 +77,7 @@
     <div class="choices hidden" id="choices"></div>
     <div class="match-meta hidden" id="selectionNote"></div>
   </section>
-  <p class="foot">Fast mobile OCR engine powered by RapidOCR and fuzzy string lookup. Keeps scanning smooth and instantly matches names against your full Excel/Cloud inventory.</p>
+  <p class="foot">Fast local scanner using Tesseract with image downscaling, combined with RapidFuzz for robust product name matching against your Excel database.</p>
 </main>
 <canvas id="canvas" class="hidden"></canvas>
 <script>
@@ -87,7 +86,7 @@
   const API_URL = "https://vestige-products-api.vinaykinnera3301.workers.dev/";
   const $ = id => document.getElementById(id);
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
-  let products = [], productNamesList = [], stream = null, ocrEngine = null, scanTimer = null;
+  let products = [], productNamesList = [], stream = null, worker = null, scanTimer = null;
   let busy = false, lastFrameSample = null, stableFrames = 0, motionDetected = false;
   let finalSelectionMade = false, autoFinalizeTimer = null;
   const AUTO_FINALIZE_DELAY_MS = 3000;
@@ -124,7 +123,6 @@
       products = []; $("apiBadge").textContent = "API not connected";
       $("apiBadge").style.borderColor = "#a64b4b";
       setStatus("Product API error: " + (error?.message || String(error)));
-      console.error("Product API connection failed:", error);
       return false;
     }
   }
@@ -137,17 +135,15 @@
 
   function findMatches(ocrText) {
     if (!ocrText || !products.length) return [];
-    
-    // Use RapidFuzz WRatio for robust token/string matching against the product list
+    // RapidFuzz WRatio handles partial word matches, typos, and missing brand text cleanly
     const results = rapidfuzz.process.extract(
       ocrText, 
       productNamesList, 
       { scorer: rapidfuzz.fuzz.WRatio, limit: 5 }
     );
-
     return results.map(([matchedName, score, index]) => ({
       product: products[index],
-      score: score / 100.0, // Normalize to 0-1 range
+      score: score / 100.0,
       matchedName
     }));
   }
@@ -185,7 +181,7 @@
     $("mrp").textContent = "—"; $("dp").textContent = "—"; $("pv").textContent = "—";
     
     const top = matches[0];
-    const canAutoFinalize = top.score >= 0.70;
+    const canAutoFinalize = top.score >= 0.72;
     
     $("matchMeta").textContent = canAutoFinalize
       ? "Top match confirmed automatically in 3 seconds. Tap another to override."
@@ -246,16 +242,15 @@
 
     try {
       const crop = getPortraitCrop();
-      // Downscale long edge to max 640px for ultra-fast OCR execution
-      const scale = Math.min(1, 640 / Math.max(crop.sw, crop.sh));
+      // Downscale long edge to max 700px for speedy Tesseract recognition
+      const scale = Math.min(1, 700 / Math.max(crop.sw, crop.sh));
       canvas.width = Math.max(1, Math.round(crop.sw * scale)); 
       canvas.height = Math.max(1, Math.round(crop.sh * scale));
       
       ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
       
-      // Run RapidOCR
-      const res = await ocrEngine.run(canvas);
-      const recognizedText = res && res.text ? res.text : (Array.isArray(res) ? res.map(r => r.text).join(" ") : "");
+      const result = await worker.recognize(canvas);
+      const recognizedText = result?.data?.text || "";
       
       const matches = findMatches(recognizedText);
       displayMatches(matches);
@@ -281,28 +276,27 @@
     try {
       if (!products.length && !(await loadProducts())) return;
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access unavailable over non-HTTPS.");
-      setStatus("Starting camera & OCR model…");
+      setStatus("Starting camera & text engine…");
       
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
       video.srcObject = stream; await video.play();
       
       $("startBtn").disabled = true; $("stopBtn").disabled = false; $("captureBtn").disabled = false;
 
-      if (!ocrEngine) {
-        ocrEngine = await new RapidOCR();
+      if (!worker) {
+        worker = await Tesseract.createWorker("eng");
+        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
       }
 
       clearAutoFinalizeTimer();
       lastFrameSample = null; stableFrames = 0; motionDetected = false; finalSelectionMade = false;
       setStatus("Camera ready. Hold product steady or tap Capture now.");
-      scanTimer = setInterval(monitorSteadinee, 300);
+      scanTimer = setInterval(monitorSteadiness, 350);
     } catch (error) {
       setStatus("Camera error: " + (error?.message || String(error)));
       stopCamera(false);
     }
   }
-  
-  function monitorSteadinee() { monitorSteadiness(); }
 
   function stopCamera(updateStatus = true) {
     if (scanTimer) clearInterval(scanTimer); scanTimer = null;
@@ -319,7 +313,7 @@
     if (stream) {
       lastFrameSample = null; stableFrames = 0; motionDetected = false; $("captureBtn").disabled = false;
       setStatus("Ready for next product.");
-      scanTimer = setInterval(monitorSteadinee, 300);
+      scanTimer = setInterval(monitorSteadiness, 350);
     } else setStatus("Start camera to scan.");
   }
 
