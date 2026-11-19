@@ -2626,11 +2626,11 @@ function displayMatches(matches) {
     setStatus(
       "Top match: " +
       Math.round(top.score * 100) +
-      "%. Automatically selecting in 3 seconds. You can choose another product."
+      "%. Automatically selected. You can choose another product."
     );
 
     $("matchMeta").textContent =
-      "Top match is above 62%. It will be selected automatically in 3 seconds. You can still select another product from the list.";
+      "Top match is above 62%. It will be selected automatically. You can still select another product from the list.";
 
     autoFinalizeTimer = setTimeout(() => {
 
