@@ -2361,29 +2361,6 @@ $("cartList").addEventListener("click", event => {
   }
 });
 
-$("savedList").addEventListener("click", event => {
-
-  const loadButton = event.target.closest("button[data-load-id]");
-
-  if (loadButton) {
-    loadSavedCart(loadButton.dataset.loadId);
-    return;
-  }
-
-  const deleteButton = event.target.closest("button[data-delete-id]");
-
-  if (deleteButton) {
-    deleteSavedCart(deleteButton.dataset.deleteId);
-    return;
-  }
-
-  const exportButton = event.target.closest("button[data-export-id]");
-
-  if (exportButton) {
-    exportSavedCart(exportButton.dataset.exportId);
-  }
-});
-
 $("cartName").addEventListener("input", () => {
 
   cartName = $("cartName").value;

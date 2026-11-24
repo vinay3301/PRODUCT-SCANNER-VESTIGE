@@ -375,6 +375,14 @@ test("Sale cart uses compact sale-type toggle, checkout wording, and manual stoc
   assert.doesNotMatch(html, /Switching modes will clear it/);
 });
 
+test("Every static event-listener target is present in the HTML or generated UI markup", () => {
+  const declaredIds = new Set([...html.matchAll(/id=["']([^"']+)["']/g)].map(match => match[1]));
+  const listenerTargets = [...html.matchAll(/\$\(["']([^"']+)["']\)\.addEventListener/g)].map(match => match[1]);
+  const missingTargets = [...new Set(listenerTargets.filter(id => !declaredIds.has(id)))];
+  assert.deepEqual(missingTargets, []);
+  assert.doesNotMatch(html, /\$\(["']savedList["']\)\.addEventListener/);
+});
+
 test("Stock List and Sale History limit the viewport to five entries", () => {
   assert.match(html, /limitListToFive\(el\)/);
   assert.match(html, /limitListToFive\(el\);/);
