@@ -214,6 +214,42 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
   assert.equal(x.context.cart.length, 1);
 });
 
+test("Initial payment above the sale total is rejected without posting the sale", () => {
+  const x = createHarness();
+  x.context.currentMode = "selling";
+  x.context.businessData.inventory[k1] = { product: assure, quantity: 5 };
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.$("receivedNow").value = "200";
+  x.$("receivedMethod").value = "Cash";
+  x.context.postSale();
+  assert.equal(x.context.businessData.sales.length, 0);
+  assert.equal(x.context.getStockQuantity(k1), 5);
+  assert.equal(x.context.cart.length, 1);
+  assert.match(x.alerts.at(-1), /cannot exceed the sale total/i);
+});
+
+test("Invalid payment method is rejected without adding a ledger entry", () => {
+  const x = createHarness();
+  x.context.businessData.sales = [{ id: "sale-1", createdAt: new Date().toISOString(), total: 100, items: [], payments: [], refunds: [] }];
+  x.prompts.push("25", "Cheque");
+  x.context.recordSalePayment("sale-1");
+  assert.equal(x.context.businessData.sales[0].payments.length, 0);
+  assert.match(x.alerts.at(-1), /Cash or Online/i);
+});
+
+test("Refund cannot exceed the amount due or use an unsupported method", () => {
+  const x = createHarness();
+  x.context.businessData.sales = [{ id: "sale-1", createdAt: new Date().toISOString(), total: 50, items: [], payments: [{ id: "p1", createdAt: new Date().toISOString(), amount: 80, method: "Cash" }], refunds: [] }];
+  x.prompts.push("31");
+  x.context.recordSaleRefund("sale-1");
+  assert.equal(x.context.businessData.sales[0].refunds.length, 0);
+  assert.match(x.alerts.at(-1), /not exceeding the refund due/i);
+  x.prompts.push("20", "Cheque");
+  x.context.recordSaleRefund("sale-1");
+  assert.equal(x.context.businessData.sales[0].refunds.length, 0);
+  assert.match(x.alerts.at(-1), /Cash or Online/i);
+});
+
 test("Transaction busy guard prevents a second submission", () => {
   const x = createHarness();
   x.context.transactionBusy = true;
