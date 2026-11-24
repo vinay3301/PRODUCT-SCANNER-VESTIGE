@@ -787,7 +787,6 @@ button:disabled {
   <section class="business-panel" id="inventoryPanel">
     <h2>Current Stock</h2>
     <div class="business-grid">
-      <div class="business-stat"><small>Stock MRP Value</small><strong id="stockMrpValue">₹0.00</strong></div>
       <div class="business-stat"><small>Stock DP Value</small><strong id="stockDpValue">₹0.00</strong></div>
       <div class="business-stat"><small>Stock PV Value</small><strong id="stockPvValue">0</strong></div>
     </div>
@@ -799,16 +798,7 @@ button:disabled {
     <div class="business-list hidden" id="stockHistoryList"></div>
   </section>
 
-  <section class="business-panel hidden" id="salesPanel">
-    <h2>Sales</h2>
-    <div class="business-muted">Save a sale to deduct paid and free quantities from stock. Payments can be recorded now or later.</div>
-    <div class="business-fields">
-      <div class="business-field"><label for="receivedNow">Amount received now (optional)</label><input class="business-input" id="receivedNow" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="business-field"><label for="receivedMethod">Payment method</label><select class="business-input" id="receivedMethod"><option value="">Choose if received</option><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
-    </div>
-    <div class="business-actions"><button type="button" id="toggleSalesHistoryBtn">Sales history</button></div>
-    <div class="business-list hidden" id="salesHistoryList"></div>
-  </section>
+
 
 
   <!-- SHOPPING CART -->
@@ -2454,7 +2444,7 @@ $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
 $("sellingModeBtn").addEventListener("click",()=>setBusinessMode("selling"));
 $("toggleStockListBtn").addEventListener("click",()=>{$("stockList").classList.toggle("hidden");renderInventory();});
 $("toggleStockHistoryBtn").addEventListener("click",()=>{$("stockHistoryList").classList.toggle("hidden");renderStockHistory();});
-$("toggleSalesHistoryBtn").addEventListener("click",()=>{$("salesHistoryList").classList.toggle("hidden");renderSalesHistory();});
+
 $("exportBackupBtn").addEventListener("click",exportBusinessBackup);
 $("importBackupBtn").addEventListener("click",()=>$("backupFile").click());
 $("backupFile").addEventListener("change",importBusinessBackup);
@@ -2549,7 +2539,6 @@ function setBusinessMode(mode){
   $("cartSection").querySelector("h2").textContent=currentMode==="stocking"?"Stock-In Cart":"Selling Cart";
   renderCart();renderInventory();if(currentMode==="selling")renderSalesHistory();
 }
-function recordPayment(sale,amount,method){sale.payments=Array.isArray(sale.payments)?sale.payments:[];sale.payments.push({id:makeRecordId(),createdAt:new Date().toISOString(),amount,method});}
 function postStockIn(){
   const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add at least one product with a positive quantity.");return;}
   const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData));
@@ -2579,22 +2568,6 @@ function postSale(){
   if(!saveBusinessData(next))return;editingSaleId=null;cart=[];cartName="";$("cartName").value="";$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();renderInventory();renderSalesHistory();setStatus("Sale saved. Stock adjusted; payment status is shown in Sales history.");
 }
 function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(currentMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;$("postTransactionBtn").disabled=!cart.length;}}
-function recordSalePayment(id){
-  const next=JSON.parse(JSON.stringify(businessData)),s=next.sales.find(x=>x.id===id);if(!s)return;
-  const raw=prompt("Payment amount received (₹):");if(raw===null)return;const amount=Math.round(Number(raw)*100)/100;if(!Number.isFinite(amount)||amount<=0)return alert("Enter a valid amount greater than zero.");
-  const paid=(s.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),refunded=(s.refunds||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),remaining=Math.max(0,Number(s.total||0)-paid+refunded);
-  if(amount>remaining+0.001)return alert("Payment cannot exceed the outstanding balance of ₹"+remaining.toFixed(2)+".");
-  const method=prompt("Payment method: type Cash or Online");if(method===null)return;const m=method.trim().toLowerCase();if(!["cash","online"].includes(m))return alert("Payment method must be Cash or Online.");
-  recordPayment(s,amount,m==="cash"?"Cash":"Online");if(saveBusinessData(next))renderSalesHistory();
-}
-function recordSaleRefund(id){
-  const next=JSON.parse(JSON.stringify(businessData)),s=next.sales.find(x=>x.id===id);if(!s)return;
-  const received=(s.payments||[]).reduce((a,p)=>a+Number(p.amount||0),0),refunded=(s.refunds||[]).reduce((a,p)=>a+Number(p.amount||0),0),due=Math.max(0,received-refunded-Number(s.total||0));
-  if(due<=0.009)return alert("There is no refund due for this sale.");
-  const raw=prompt("Refund amount (up to ₹"+due.toFixed(2)+"):");if(raw===null)return;const amount=Math.round(Number(raw)*100)/100;if(!Number.isFinite(amount)||amount<=0||amount>due+0.001)return alert("Enter a valid amount not exceeding the refund due.");
-  const method=prompt("Refund method: type Cash or Online");if(method===null)return;const m=method.trim().toLowerCase();if(!["cash","online"].includes(m))return alert("Refund method must be Cash or Online.");
-  s.refunds=Array.isArray(s.refunds)?s.refunds:[];s.refunds.push({id:makeRecordId(),createdAt:new Date().toISOString(),amount,method:m==="cash"?"Cash":"Online"});if(saveBusinessData(next))renderSalesHistory();
-}
 function beginSaleEdit(id){
   const s=businessData.sales.find(x=>x.id===id);if(!s)return;if(Date.now()-new Date(s.createdAt).getTime()>7*86400000)return alert("This sale is older than 7 days and cannot be edited.");
   if(cart.length&&!confirm("Replace the current cart with this sale for editing?"))return;
