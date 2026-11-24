@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#123b2a">
+<meta name="theme-color" content="#f5f7f6">
+<script>
+try { const savedTheme=localStorage.getItem("psv-theme"); document.documentElement.dataset.theme=savedTheme==="dark"?"dark":"light"; }
+catch(error) { document.documentElement.dataset.theme="light"; }
+</script>
 <meta name="description" content="Fast camera-based product information scanner">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Product Scanner</title>
@@ -12,12 +16,24 @@
 
 <style>
 :root {
+  color-scheme:light;
+  --bg:#f5f7f6; --panel:var(--text)fff; --green:#167a45; --muted:#5f6e64; --line:#d8e2da;
+  --text:#17251c; --primary-text:var(--text)fff; --secondary-bg:#e8efea; --secondary-text:#26382c;
+  --raised:#f1f6f2; --accent-soft:#176a3d; --foot:#66776b; --pill-text:#176a3d;
+  --pill-border:#a8cbb5; --pill-bg:#edf7f0; --input-bg:var(--text)fff; --inactive-border:#d8dfda;
+  --control-bg:#e7eee9; --button-bg:#dbe8df; --button-text:#26382c; --summary-bg:#f3f7f4;
+  --summary-text:#405247; --danger-bg:var(--text)0ee; --danger-text:#9b3026; --danger-border:#e4b7b1;
+  --danger-dark-bg:#fbe6e3; --subtle-text:#526358; --history-text:#405247;
+}
+:root[data-theme="dark"] {
   color-scheme:dark;
-  --bg:#08130e;
-  --panel:#11251a;
-  --green:#70d69b;
-  --muted:#a8b9ae;
-  --line:#294536;
+  --bg:var(--bg); --panel:var(--panel); --green:var(--green); --muted:var(--muted); --line:var(--line);
+  --text:var(--text); --primary-text:var(--primary-text); --secondary-bg:var(--secondary-bg); --secondary-text:var(--subtle-text);
+  --raised:var(--raised); --accent-soft:var(--accent-soft); --foot:var(--foot); --pill-text:var(--pill-text);
+  --pill-border:var(--pill-border); --pill-bg:var(--pill-bg); --input-bg:var(--input-bg); --inactive-border:var(--inactive-border);
+  --control-bg:var(--control-bg); --button-bg:var(--button-bg); --button-text:var(--button-text); --summary-bg:var(--summary-bg);
+  --summary-text:var(--summary-text); --danger-bg:var(--danger-bg); --danger-text:var(--danger-text); --danger-border:var(--danger-border);
+  --danger-dark-bg:var(--danger-dark-bg); --subtle-text:var(--subtle-text); --history-text:var(--history-text);
 }
 
 * { box-sizing:border-box }
@@ -25,7 +41,7 @@
 body {
   margin:0;
   background:var(--bg);
-  color:#f4faf6;
+  color:var(--text);
   font:16px system-ui,-apple-system,Segoe UI,sans-serif;
 }
 
@@ -126,13 +142,13 @@ button {
 
 .primary {
   background:var(--green);
-  color:#062012;
+  color:var(--primary-text);
   flex:1;
 }
 
 .secondary {
-  background:#20372a;
-  color:#f4faf6;
+  background:var(--secondary-bg);
+  color:var(--text);
 }
 
 button:disabled {
@@ -187,7 +203,7 @@ button:disabled {
 
 .add-button {
   background:var(--green);
-  color:#062012;
+  color:var(--primary-text);
 }
 
 .prices {
@@ -198,7 +214,7 @@ button:disabled {
 }
 
 .price {
-  background:#1a3324;
+  background:var(--raised);
   border-radius:12px;
   padding:11px 9px;
   min-width:0;
@@ -233,8 +249,8 @@ button:disabled {
 
 .choice {
   text-align:left;
-  background:#1a3324;
-  color:#fff;
+  background:var(--raised);
+  color:var(--text);
   border:1px solid var(--line);
   line-height:1.5;
   width:100%;
@@ -247,22 +263,22 @@ button:disabled {
 }
 
 #selectionNote {
-  color:#9be2b6;
+  color:var(--accent-soft);
   font-weight:650;
 }
 
 #scanAgainBtn { width:100% }
 
 .foot {
-  color:#83988a;
+  color:var(--foot);
   font-size:11px;
   line-height:1.45;
   padding:12px 4px;
 }
 
 .pill {
-  color:#bce9cc;
-  border:1px solid #386449;
+  color:var(--pill-text);
+  border:1px solid var(--pill-border);
   border-radius:99px;
   padding:5px 9px;
   font-size:11px;
@@ -296,9 +312,9 @@ button:disabled {
 }
 
 .cart-count {
-  background:#203d2b;
-  color:#bce9cc;
-  border:1px solid #386449;
+  background:var(--pill-bg);
+  color:var(--pill-text);
+  border:1px solid var(--pill-border);
   border-radius:99px;
   padding:5px 10px;
   font-size:12px;
@@ -314,8 +330,8 @@ button:disabled {
 
 .cart-name-input {
   width:100%;
-  background:#081a10;
-  color:#fff;
+  background:var(--input-bg);
+  color:var(--text);
   border:1px solid var(--line);
   border-radius:10px;
   padding:12px;
@@ -341,7 +357,7 @@ button:disabled {
 }
 
 .cart-item {
-  background:#1a3324;
+  background:var(--raised);
   border:1px solid var(--line);
   border-radius:13px;
   padding:11px 12px;
@@ -355,7 +371,7 @@ button:disabled {
 
 .cart-item.inactive {
   opacity:.38;
-  border-color:#26372c;
+  border-color:var(--inactive-border);
 }
 
 .cart-item-info {
@@ -383,7 +399,7 @@ button:disabled {
   display:flex;
   align-items:center;
   gap:7px;
-  background:#0c2014;
+  background:var(--control-bg);
   padding:4px;
   border-radius:10px;
   flex:none;
@@ -394,8 +410,8 @@ button:disabled {
   height:32px;
   padding:0;
   border-radius:8px;
-  background:#294936;
-  color:#fff;
+  background:var(--button-bg);
+  color:var(--text);
   font-size:20px;
   display:flex;
   justify-content:center;
@@ -414,7 +430,7 @@ button:disabled {
   margin-top:16px;
   padding:14px;
   border-radius:13px;
-  background:#0b1d12;
+  background:var(--summary-bg);
   border:1px solid var(--line);
 }
 
@@ -431,11 +447,11 @@ button:disabled {
   gap:10px;
   margin-top:9px;
   font-size:13px;
-  color:#c5d8cb;
+  color:var(--summary-text);
 }
 
 .summary-row strong {
-  color:#fff;
+  color:var(--text);
   font-size:15px;
 }
 
@@ -471,30 +487,30 @@ button:disabled {
 
 .save-cart-btn {
   background:var(--green);
-  color:#062012;
+  color:var(--primary-text);
 }
 
 .view-saved-btn {
-  background:#20372a;
-  color:#f4faf6;
+  background:var(--secondary-bg);
+  color:var(--text);
 }
 
 .export-cart-btn {
-  background:#294936;
-  color:#e5f8eb;
+  background:var(--button-bg);
+  color:var(--button-text);
 }
 
 .clear-cart-btn {
-  background:#392321;
-  color:#ffd2cc;
-  border:1px solid #69413b;
+  background:var(--danger-bg);
+  color:var(--danger-text);
+  border:1px solid var(--danger-border);
 }
 
 /* SAVED CARTS */
 
 .saved-section {
   margin-top:16px;
-  background:#0b1d12;
+  background:var(--summary-bg);
   border:1px solid var(--line);
   border-radius:14px;
   padding:14px;
@@ -515,7 +531,7 @@ button:disabled {
 }
 
 .saved-cart-item {
-  background:#1a3324;
+  background:var(--raised);
   border:1px solid var(--line);
   border-radius:12px;
   padding:12px;
@@ -543,25 +559,25 @@ button:disabled {
 
 .load-saved-btn {
   background:var(--green);
-  color:#062012;
+  color:var(--primary-text);
   padding:10px;
 }
 
 .export-saved-btn {
-  background:#294936;
-  color:#e5f8eb;
+  background:var(--button-bg);
+  color:var(--button-text);
   padding:10px;
 }
 
 .delete-saved-btn {
-  background:#482824;
-  color:#ffd2cc;
+  background:var(--danger-dark-bg);
+  color:var(--danger-text);
   padding:10px;
 }
 
 .close-saved-btn {
-  background:#20372a;
-  color:#fff;
+  background:var(--secondary-bg);
+  color:var(--text);
   padding:10px 14px;
 }
 
@@ -647,31 +663,35 @@ button:disabled {
 }
 /* Dealer stock and sales */
 .mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.mode-switch button{background:#20372a;color:#dcebe1;border:1px solid var(--line)}
-.mode-switch button.active{background:var(--green);color:#062012}
+.mode-switch button{background:var(--secondary-bg);color:var(--subtle-text);border:1px solid var(--line)}
+.mode-switch button.active{background:var(--green);color:var(--primary-text)}
 .business-panel{margin:14px 0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
 .business-panel h2{font-size:17px;margin:0 0 10px}
 .business-muted{color:var(--muted);font-size:12px;line-height:1.5}
 .business-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.business-stat{background:#1a3324;border-radius:11px;padding:10px;min-width:0}
+.business-stat{background:var(--raised);border-radius:11px;padding:10px;min-width:0}
 .business-stat small{display:block;color:var(--muted);font-size:10px}
 .business-stat strong{display:block;margin-top:5px;font-size:15px;overflow-wrap:anywhere}
 .business-list{display:grid;gap:8px;margin-top:10px}
-.business-row,.history-card{background:#1a3324;border:1px solid var(--line);border-radius:11px;padding:11px}
+.business-row,.history-card{background:var(--raised);border:1px solid var(--line);border-radius:11px;padding:11px}
 .business-row{display:flex;justify-content:space-between;gap:10px;align-items:center}
 .business-row strong,.history-card strong{font-size:13px}
 .business-row small,.history-card small{display:block;color:var(--muted);font-size:11px;line-height:1.5;margin-top:4px}
 .business-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
-.business-actions button,.history-card button{padding:8px 10px;font-size:11px;background:#294936;color:#e5f8eb}
+.business-actions button,.history-card button{padding:8px 10px;font-size:11px;background:var(--button-bg);color:var(--button-text)}
 .business-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:10px 0}
 .business-field label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}
-.business-input{width:100%;background:#081a10;color:#fff;border:1px solid var(--line);border-radius:9px;padding:10px;font-size:14px}
-.free-quantity{width:62px;background:#081a10;color:#fff;border:1px solid #386449;border-radius:7px;padding:7px;text-align:center}
-.history-detail{font-size:12px;color:#d2e1d7;line-height:1.6;margin-top:7px;overflow-wrap:anywhere}
+.business-input{width:100%;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:14px}
+.free-quantity{width:62px;background:var(--input-bg);color:var(--text);border:1px solid var(--pill-border);border-radius:7px;padding:7px;text-align:center}
+.history-detail{font-size:12px;color:var(--history-text);line-height:1.6;margin-top:7px;overflow-wrap:anywhere}
 .backup-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.backup-actions button{background:#294936;color:#e5f8eb}
+.backup-actions button{background:var(--button-bg);color:var(--button-text)}
 #backupFile{display:none}
 @media(max-width:420px){.business-grid,.business-fields{grid-template-columns:1fr 1fr}.business-stat strong{font-size:13px}}
+
+.theme-toggle{width:42px;height:42px;min-width:42px;padding:0;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--secondary-bg);color:var(--text);border:1px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.theme-toggle svg{width:20px;height:20px;display:block}
+.theme-toggle:focus-visible{outline:3px solid var(--green);outline-offset:2px}
 </style>
 </head>
 
@@ -682,6 +702,9 @@ button:disabled {
     <h1>Product Scanner</h1>
     <div class="sub">Enhanced Multi-Pass OCR Match Engine</div>
   </div>
+  <button class="theme-toggle" id="themeToggleBtn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>
+  </button>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
 
@@ -1202,11 +1225,14 @@ function normalizeCartItem(item) {
 
   if (!Number.isFinite(quantity)) return null;
 
+  const freeQuantity=Math.max(0,Math.floor(Number(item.freeQuantity)||0));
+  const alreadyIncludesFree=item.quantityIncludesFree===true;
   return {
     key:String(item.key || normalizeText(item.product.name)),
     product:item.product,
-    quantity:Math.max(0,Math.floor(quantity)),
-    freeQuantity:Math.max(0,Math.floor(Number(item.freeQuantity)||0))
+    quantity:Math.max(0,Math.floor(quantity))+(alreadyIncludesFree?0:freeQuantity),
+    freeQuantity,
+    quantityIncludesFree:true
   };
 }
 
@@ -1276,12 +1302,10 @@ function loadSavedCartsFromStorage() {
     const parsed = saved ? JSON.parse(saved) : [];
 
     savedCarts = Array.isArray(parsed)
-      ? parsed.filter(item =>
-          item &&
-          Array.isArray(item.cart) &&
-          item.cart.length > 0
-        )
+      ? parsed.filter(item => item && Array.isArray(item.cart) && item.cart.length > 0)
+        .map(item => ({...item,cart:item.cart.map(normalizeCartItem).filter(Boolean)}))
       : [];
+    saveSavedCartsToStorage();
 
   } catch (error) {
 
@@ -1318,7 +1342,7 @@ function addSelectedProductToCart() {
 
   const existing = cart.find(item => item.key === key);
   if (currentMode === "selling") {
-    const currentQty = (Number(existing?.quantity)||0) + (Number(existing?.freeQuantity)||0);
+    const currentQty = Number(existing?.quantity)||0;
     if (currentQty + 1 > getSaleStockLimit(key)) {
       alert("No additional stock is available for " + product.name + ".");
       return;
@@ -1337,7 +1361,8 @@ function addSelectedProductToCart() {
         pv:product.pv
       },
       quantity:1,
-      freeQuantity:0
+      freeQuantity:0,
+      quantityIncludesFree:true
     });
   }
 
@@ -1374,12 +1399,13 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
-  if(currentMode==="selling"&&change>0&&Number(item.quantity)+Number(item.freeQuantity||0)+change>getSaleStockLimit(key)){
+  if(currentMode==="selling"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){
     alert("You cannot add more than the available stock for "+item.product.name+".");
     return;
   }
-  item.quantity = Math.max(0,Number(item.quantity)+change);
-  if (item.quantity===0 && !(Number(item.freeQuantity)>0)) cart=cart.filter(entry=>entry!==item);
+  item.quantity=Math.max(0,Number(item.quantity)+change);
+  item.freeQuantity=Math.min(Number(item.freeQuantity)||0,item.quantity);
+  if(item.quantity===0)cart=cart.filter(entry=>entry!==item);
   saveCartToStorage();
   renderCart();
 }
@@ -1441,7 +1467,8 @@ function saveCurrentCart() {
         pv:item.product.pv
       },
       quantity:item.quantity,
-      freeQuantity:Number(item.freeQuantity)||0
+      freeQuantity:Number(item.freeQuantity)||0,
+      quantityIncludesFree:true
     }))
   };
 
@@ -1535,32 +1562,11 @@ function deleteSavedCart(id) {
 // ==========================================
 
 function calculateCartTotals(items) {
-
-  const activeItems = items.filter(item =>
-    Number(item.quantity) > 0 ||
-    (currentMode === "selling" && Number(item.freeQuantity) > 0)
-  );
-
-  const totalQuantity = activeItems.reduce(
-    (sum, item) => sum + Number(item.quantity) + (currentMode==="selling" ? Math.max(0,Number(item.freeQuantity)||0) : 0),
-    0
-  );
-
-  const totalDP = activeItems.reduce(
-    (sum, item) =>
-      sum +
-      numericValue(item.product.DP) *
-      Number(item.quantity),
-    0
-  );
-
-  const totalPV = activeItems.reduce(
-    (sum, item) =>
-      sum +
-      numericValue(item.product.pv) *
-      Number(item.quantity),
-    0
-  );
+  const activeItems=items.filter(item=>Number(item.quantity)>0);
+  const totalQuantity=activeItems.reduce((sum,item)=>sum+Number(item.quantity),0);
+  const paidQuantity=item=>Math.max(0,Number(item.quantity)-(currentMode==="selling"?Math.max(0,Number(item.freeQuantity)||0):0));
+  const totalDP=activeItems.reduce((sum,item)=>sum+numericValue(item.product.DP)*paidQuantity(item),0);
+  const totalPV=activeItems.reduce((sum,item)=>sum+numericValue(item.product.pv)*paidQuantity(item),0);
 
   return {
     activeItems,
@@ -1659,10 +1665,11 @@ function renderCart() {
 
   cart.forEach(item => {
 
-    const product = item.product;
-    const quantity = Number(item.quantity) + (currentMode==="selling" ? Math.max(0,Number(item.freeQuantity)||0) : 0);
-
-    const isActive = quantity > 0;
+    const product=item.product;
+    const quantity=Number(item.quantity);
+    const freeQuantity=Math.min(quantity,Math.max(0,Number(item.freeQuantity)||0));
+    const paidQuantity=Math.max(0,quantity-freeQuantity);
+    const isActive=quantity>0;
 
     const row = document.createElement("div");
 
