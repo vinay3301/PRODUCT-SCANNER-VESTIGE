@@ -301,7 +301,7 @@ async function testAsync(name, fn) {
     assert.match(x.alerts.at(-1), /import failed/i);
   });
 
-  const asyncResults = results.slice(15);
+  const asyncResults = results.slice(16);
   const asyncFailed = asyncResults.filter(r => r.status === "FAIL");
   console.log("\nBackup import integration checks");
   for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
