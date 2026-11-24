@@ -26,7 +26,7 @@ function createHarness() {
   function $(id) {
     if (!elements.has(id)) {
       elements.set(id, {
-        value: "", textContent: "", innerHTML: "", disabled: false, files: [],
+        value: "", textContent: "", innerHTML: "", disabled: false, files: [], style: {}, children: [], scrollTop: 0,
         classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} },
         setAttribute: () => {},
         addEventListener: () => {}, previousElementSibling: { textContent: "" },
