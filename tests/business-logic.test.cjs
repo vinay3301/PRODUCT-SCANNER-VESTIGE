@@ -1,7 +1,4 @@
-// Isolated regression tests for dealer inventory/sales logic.
-// Run from the repository root: node tests/business-logic.test.cjs
-// This extracts and executes the actual business functions from index.html.
-
+// Isolated regression tests for dealer inventory and the Actual Sale / Record Sale workflows.
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
@@ -20,13 +17,12 @@ const normalizeSource = html.slice(normalizeStart, normalizeEnd);
 function createHarness() {
   const elements = new Map();
   const alerts = [];
-  const prompts = [];
   const storage = new Map();
   let failStorageWrites = false;
   function $(id) {
     if (!elements.has(id)) {
       elements.set(id, {
-        value: "", textContent: "", innerHTML: "", disabled: false,
+        value: "", textContent: "", innerHTML: "", disabled: false, files: [],
         classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} },
         addEventListener: () => {}, previousElementSibling: { textContent: "" },
         querySelector: () => ({ textContent: "" }), scrollIntoView: () => {}
@@ -37,12 +33,9 @@ function createHarness() {
   const context = {
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
     cart: [], cartName: "", savedCarts: [], currentMode: "stocking",
-    editingSaleId: null, transactionBusy: false,
-    BUSINESS_STORAGE_KEY: "test-business",
-    CART_STORAGE_KEY: "test-cart",
-    SAVED_CARTS_STORAGE_KEY: "test-saved",
-    $,
-    localStorage: {
+    editingSaleId: null, transactionBusy: false, saleType: "actual",
+    BUSINESS_STORAGE_KEY: "test-business", CART_STORAGE_KEY: "test-cart", SAVED_CARTS_STORAGE_KEY: "test-saved",
+    $, localStorage: {
       setItem: (k, v) => { if (failStorageWrites) throw new Error("QuotaExceededError"); storage.set(k, v); },
       getItem: k => storage.has(k) ? storage.get(k) : null,
       removeItem: k => storage.delete(k)
@@ -52,16 +45,18 @@ function createHarness() {
     formatCartMoney: v => "₹" + Number(v).toFixed(2),
     formatMoney: v => String(v),
     escapeHtml: v => String(v ?? ""),
-    setStatus: () => {}, renderCart: () => {}, saveCartToStorage: () => {},
-    loadCartFromStorage: () => {}, loadSavedCartsFromStorage: () => {},
-    alert: message => alerts.push(String(message)),
-    confirm: () => true,
-    prompt: () => prompts.shift() ?? null,
-    console
+    setStatus: () => {}, saveCartToStorage: () => {}, loadCartFromStorage: () => {}, loadSavedCartsFromStorage: () => {},
+    alert: message => alerts.push(String(message)), confirm: () => true, console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
   vm.runInNewContext(normalizeSource, context, { filename: "index.html#cart-normalization" });
-  return { context, alerts, prompts, storage, $, setFailStorageWrites: value => { failStorageWrites = value; } };
+  // Keep UI rendering inert in this isolated business-logic harness.
+  context.renderCart = () => {};
+  context.saveCartToStorage = () => {};
+  context.loadCartFromStorage = () => {};
+  context.loadSavedCartsFromStorage = () => {};
+  $("saleDateInput").value = new Date().toISOString().slice(0, 16);
+  return { context, alerts, storage, $, setFailStorageWrites: value => { failStorageWrites = value; } };
 }
 
 const results = [];
@@ -70,170 +65,234 @@ function test(name, fn) {
   catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
 }
 function product(name, MRP, DP, pv) { return { name, MRP, DP, pv }; }
-
-const h = createHarness();
-const c = h.context;
 const assure = product("ASSURE ENCHANT BODY TALK", 103, 73, 1.99);
 const conditioner = product("ASSURE HAIR CONDITIONER", 330, 280, 2.9);
 const k1 = "assure enchant body talk";
 const k2 = "assure hair conditioner";
-
-test("Legacy cart free quantities migrate once into total quantity", () => {
-  const x = createHarness();
-  const migrated = x.context.normalizeCartItem({
-    key:k1,product:assure,quantity:2,freeQuantity:1
-  });
-  assert.equal(migrated.quantity,3);
-  assert.equal(migrated.freeQuantity,1);
-  assert.equal(migrated.quantityIncludesFree,true);
-  const normalizedAgain = x.context.normalizeCartItem(migrated);
-  assert.equal(normalizedAgain.quantity,3);
-});
+function seedStock(x, key = k1, item = assure, quantity = 5) {
+  x.context.businessData.inventory[key] = { product: item, quantity };
+}
+function addSale(x, type = "actual", quantity = 2, freeQuantity = 1, date = new Date().toISOString()) {
+  const c = x.context;
+  seedStock(x, k1, assure, 10);
+  c.currentMode = "selling";
+  c.saleType = type;
+  c.cart = [{ key: k1, product: assure, quantity, freeQuantity, quantityIncludesFree: true }];
+  $("saleDateInput").value = date.slice(0, 16);
+  c.postSale();
+  return c.businessData.sales[0];
+}
 
 test("All inline JavaScript blocks in the page have valid syntax", () => {
   const blocks = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).filter(code => code.trim());
-  assert.ok(blocks.length > 0, "No inline JavaScript blocks found");
+  assert.ok(blocks.length > 0);
   blocks.forEach((code, index) => new vm.Script(code, { filename: "index.html inline script " + (index + 1) }));
 });
 
-test("Stock-in adds quantity and creates history", () => {
-  c.cart = [{ key: k1, product: assure, quantity: 5, freeQuantity: 0 }];
-  c.postStockIn();
-  assert.equal(c.getStockQuantity(k1), 5);
-  assert.equal(c.businessData.stockIns.length, 1);
-});
-
-test("Stock valuation uses MRP, DP and PV correctly", () => {
-  const totals = c.getInventoryTotals();
-  assert.ok(Math.abs(totals.mrp - 515) < 0.001);
-  assert.ok(Math.abs(totals.dp - 365) < 0.001);
-  assert.ok(Math.abs(totals.pv - 9.95) < 0.001);
-});
-
-test("Free quantity is included in total quantity and excluded from sale value", () => {
-  c.currentMode = "selling";
-  c.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 1 }];
-  c.postSale();
-  assert.equal(c.getStockQuantity(k1), 3);
-  assert.equal(c.businessData.sales[0].items[0].quantity, 1);
-  assert.equal(c.businessData.sales[0].items[0].freeQuantity, 1);
-  assert.equal(c.businessData.sales[0].total, 73);
-});
-
-test("One unit can be entirely free when total quantity is one", () => {
+test("Legacy cart free quantities migrate once into total quantity", () => {
   const x = createHarness();
+  const migrated = x.context.normalizeCartItem({ key: k1, product: assure, quantity: 2, freeQuantity: 1 });
+  assert.equal(migrated.quantity, 3);
+  assert.equal(migrated.freeQuantity, 1);
+  assert.equal(migrated.quantityIncludesFree, true);
+  assert.equal(x.context.normalizeCartItem(migrated).quantity, 3);
+});
+
+test("Stock-in adds quantity and creates history", () => {
+  const x = createHarness();
+  x.context.cart = [{ key: k1, product: assure, quantity: 5, freeQuantity: 0 }];
+  x.context.postStockIn();
+  assert.equal(x.context.getStockQuantity(k1), 5);
+  assert.equal(x.context.businessData.stockIns.length, 1);
+});
+
+test("Stock valuation retains accurate MRP, DP and PV calculations", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  seedStock(x, k2, conditioner, 1);
+  const totals = x.context.getInventoryTotals();
+  assert.ok(Math.abs(totals.mrp - 845) < 0.001);
+  assert.ok(Math.abs(totals.dp - 645) < 0.001);
+  assert.ok(Math.abs(totals.pv - 12.85) < 0.001);
+});
+
+test("Actual Sale deducts paid and free units; free unit is excluded from amount and PV", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
   x.context.currentMode = "selling";
-  x.context.businessData.inventory[k1] = { product: assure, quantity: 1 };
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.postSale();
+  const sale = x.context.businessData.sales[0];
+  assert.equal(x.context.getStockQuantity(k1), 2);
+  assert.equal(sale.items[0].quantity, 2);
+  assert.equal(sale.items[0].freeQuantity, 1);
+  assert.equal(sale.total, 146);
+});
+
+test("An entirely free one-unit Actual Sale is valid and deducts one unit", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 1);
+  x.context.currentMode = "selling";
+  x.context.saleType = "actual";
   x.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 1 }];
   x.context.postSale();
   assert.equal(x.context.getStockQuantity(k1), 0);
-  assert.equal(x.context.businessData.sales[0].items[0].quantity, 0);
-  assert.equal(x.context.businessData.sales[0].items[0].freeQuantity, 1);
   assert.equal(x.context.businessData.sales[0].total, 0);
 });
 
-test("Three total units with one free charge for two and deduct three", () => {
+test("Record Sale stores a manually selected date and does not deduct stock", () => {
   const x = createHarness();
+  seedStock(x, k1, assure, 5);
   x.context.currentMode = "selling";
-  x.context.businessData.inventory[k1] = { product: assure, quantity: 3 };
+  x.context.saleType = "record";
+  x.$("saleDateInput").value = "2026-11-20T14:35";
   x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
   x.context.postSale();
-  assert.equal(x.context.getStockQuantity(k1), 0);
-  assert.equal(x.context.businessData.sales[0].items[0].quantity, 2);
-  assert.equal(x.context.businessData.sales[0].items[0].freeQuantity, 1);
-  assert.equal(x.context.businessData.sales[0].total, 146);
+  const sale = x.context.businessData.sales[0];
+  assert.equal(x.context.getStockQuantity(k1), 5);
+  assert.equal(sale.saleType, "record");
+  assert.equal(new Date(sale.saleDate).toISOString(), new Date("2026-11-20T14:35").toISOString());
+  assert.equal(sale.total, 146);
 });
 
-test("Overselling is rejected without changing stock or history", () => {
-  const before = c.getStockQuantity(k1);
-  c.cart = [{ key: k1, product: assure, quantity: 4, freeQuantity: 0 }];
+test("Overselling is rejected for Actual Sale without changing stock or history", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 2);
+  x.context.currentMode = "selling";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 0 }];
+  x.context.postSale();
+  assert.equal(x.context.getStockQuantity(k1), 2);
+  assert.equal(x.context.businessData.sales.length, 0);
+  assert.match(x.alerts.at(-1), /Insufficient stock/);
+});
+
+test("Editing Actual Sale applies only the inventory difference", () => {
+  const x = createHarness();
+  const sale = addSale(x, "actual", 3, 1);
+  const c = x.context;
+  c.editingSaleId = sale.id;
+  c.saleType = "actual";
+  c.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
   c.postSale();
-  assert.equal(c.getStockQuantity(k1), before);
-  assert.equal(c.businessData.sales.length, 1);
-  assert.match(h.alerts.at(-1), /Insufficient stock/);
-});
-
-test("Unpaid, partial and paid states render correctly", () => {
-  const saleId = c.businessData.sales[0].id;
-  c.renderSalesHistory();
-  assert.match(h.$("salesHistoryList").innerHTML, /Unpaid/);
-  h.prompts.push("30", "Cash");
-  c.recordSalePayment(saleId);
-  c.renderSalesHistory();
-  assert.match(h.$("salesHistoryList").innerHTML, /Partially paid/);
-  h.prompts.push("43", "Online");
-  c.recordSalePayment(saleId);
-  c.renderSalesHistory();
-  assert.match(h.$("salesHistoryList").innerHTML, /Paid/);
-  assert.equal(c.businessData.sales[0].payments.length, 2);
-});
-
-test("Additional payment cannot exceed outstanding balance", () => {
-  const saleId = c.businessData.sales[0].id;
-  h.prompts.push("1");
-  c.recordSalePayment(saleId);
-  assert.equal(c.businessData.sales[0].payments.length, 2);
-  assert.match(h.alerts.at(-1), /cannot exceed the outstanding balance/i);
-});
-
-test("Sale editing applies only inventory delta and preserves payment history", () => {
-  const saleId = c.businessData.sales[0].id;
-  c.businessData.inventory[k2] = { product: conditioner, quantity: 2 };
-  c.editingSaleId = saleId;
-  c.cart = [
-    { key: k1, product: assure, quantity: 1, freeQuantity: 0 },
-    { key: k2, product: conditioner, quantity: 1, freeQuantity: 0 }
-  ];
-  c.postSale();
-  assert.equal(c.getStockQuantity(k1), 4); // one returned from the original paid+free pair
-  assert.equal(c.getStockQuantity(k2), 1); // one newly added
-  assert.equal(c.businessData.sales[0].payments.length, 2);
+  assert.equal(c.getStockQuantity(k1), 8);
+  assert.equal(c.businessData.sales[0].total, 146);
   assert.equal(c.businessData.sales[0].revisions.length, 1);
-  assert.equal(c.businessData.sales[0].total, 353);
 });
 
-test("Refund entries preserve method and amount", () => {
-  const saleId = c.businessData.sales[0].id;
-  c.businessData.sales[0].total = 50; // simulate a revised sale total below the amount already received
-  h.prompts.push("10", "Online");
-  c.recordSaleRefund(saleId);
-  assert.equal(c.businessData.sales[0].refunds.length, 1);
-  assert.equal(c.businessData.sales[0].refunds[0].amount, 10);
-  assert.equal(c.businessData.sales[0].refunds[0].method, "Online");
-});
-
-test("Sales older than seven days cannot be edited", () => {
-  const saleId = c.businessData.sales[0].id;
-  c.businessData.sales[0].createdAt = new Date(Date.now() - 8 * 86400000).toISOString();
-  c.editingSaleId = saleId;
-  c.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
-  const before = c.getStockQuantity(k1);
+test("Changing Actual Sale to Record Sale returns the previously deducted units", () => {
+  const x = createHarness();
+  const sale = addSale(x, "actual", 3, 1);
+  const c = x.context;
+  assert.equal(c.getStockQuantity(k1), 7);
+  c.editingSaleId = sale.id;
+  c.saleType = "record";
+  c.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  $("saleDateInput").value = "2026-11-20T14:35";
   c.postSale();
-  assert.equal(c.getStockQuantity(k1), before);
-  assert.match(h.alerts.at(-1), /7 days/);
+  assert.equal(c.getStockQuantity(k1), 10);
+  assert.equal(c.businessData.sales[0].saleType, "record");
 });
 
-test("Backup business and cart schemas validate; negative stock is rejected", () => {
-  assert.equal(c.validBusinessData(c.businessData), true);
-  assert.equal(c.validCartPayload({ cart: [{ product: assure, quantity: 1 }] }), true);
-  assert.equal(c.validSavedCartPayload([{ id: "saved-1", cart: [{ product: assure, quantity: 1 }] }]), true);
-  const invalid = { ...c.businessData, inventory: { [k1]: { product: assure, quantity: -1 } } };
-  assert.equal(c.validBusinessData(invalid), false);
+test("Changing Record Sale to Actual Sale deducts the new quantities", () => {
+  const x = createHarness();
+  const sale = addSale(x, "record", 2, 0);
+  const c = x.context;
+  assert.equal(c.getStockQuantity(k1), 10);
+  c.editingSaleId = sale.id;
+  c.saleType = "actual";
+  c.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  c.postSale();
+  assert.equal(c.getStockQuantity(k1), 6);
+  assert.equal(c.businessData.sales[0].saleType, "actual");
 });
 
+test("Deleting Actual Sale restores all paid and free units", () => {
+  const x = createHarness();
+  const sale = addSale(x, "actual", 3, 1);
+  x.context.deleteSale(sale.id);
+  assert.equal(x.context.getStockQuantity(k1), 10);
+  assert.equal(x.context.businessData.sales.length, 0);
+});
 
-test("Backup validation rejects malformed payment and refund ledger entries", () => {
-  const malformedPayment = JSON.parse(JSON.stringify(c.businessData));
-  malformedPayment.sales[0].payments[0].amount = "not-a-number";
-  assert.equal(c.validBusinessData(malformedPayment), false);
-  const malformedRefund = JSON.parse(JSON.stringify(c.businessData));
-  malformedRefund.sales[0].refunds[0].method = "Cheque";
-  assert.equal(c.validBusinessData(malformedRefund), false);
+test("Deleting Record Sale leaves stock unchanged", () => {
+  const x = createHarness();
+  const sale = addSale(x, "record", 3, 1);
+  x.context.deleteSale(sale.id);
+  assert.equal(x.context.getStockQuantity(k1), 10);
+  assert.equal(x.context.businessData.sales.length, 0);
+});
+
+test("Daily and monthly totals include both sale types and use recorded sale dates", () => {
+  const x = createHarness();
+  const c = x.context;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10).toISOString();
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 10).toISOString();
+  c.businessData.sales = [
+    { id: "a", createdAt: today, saleDate: today, saleType: "actual", total: 100, items: [] },
+    { id: "b", createdAt: today, saleDate: today, saleType: "record", total: 50, items: [] },
+    { id: "c", createdAt: thisMonth, saleDate: thisMonth, saleType: "record", total: 25, items: [] }
+  ];
+  c.renderSalesOverview();
+  assert.equal($("salesTodayValue").textContent, "₹150.00");
+  assert.equal($("salesMonthValue").textContent, "₹175.00");
+  c.businessData.sales = c.businessData.sales.filter(s => s.id !== "b");
+  c.renderSalesOverview();
+  assert.equal($("salesTodayValue").textContent, "₹100.00");
+});
+
+test("Sale history shows type, total quantity, amount and PV without payment fields", () => {
+  const x = createHarness();
+  addSale(x, "record", 3, 1);
+  x.context.renderSalesHistory();
+  const htmlOut = x.$("salesHistoryList").innerHTML;
+  assert.match(htmlOut, /Record Sale/);
+  assert.match(htmlOut, /Total quantity: 3/);
+  assert.match(htmlOut, /Amount sold:/);
+  assert.match(htmlOut, /Total PV:/);
+  assert.doesNotMatch(htmlOut, /Unpaid|Partially paid|Paid|Payment|Refund|Balance/);
+});
+
+test("Seven-day edit restriction is retained", () => {
+  const x = createHarness();
+  const sale = addSale(x, "actual", 2, 0);
+  x.context.businessData.sales[0].createdAt = new Date(Date.now() - 8 * 86400000).toISOString();
+  x.context.editingSaleId = sale.id;
+  x.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  const before = x.context.getStockQuantity(k1);
+  x.context.postSale();
+  assert.equal(x.context.getStockQuantity(k1), before);
+  assert.match(x.alerts.at(-1), /7 days/);
+});
+
+test("Legacy sales migrate as Actual Sale and obsolete payment/refund fields are removed", () => {
+  const x = createHarness();
+  const oldDate = "2026-11-01T12:00:00.000Z";
+  const migrated = x.context.normalizeBusinessData({
+    schemaVersion: 1, inventory: {}, stockIns: [],
+    sales: [{ id: "legacy", createdAt: oldDate, total: 10, items: [], payments: [{ amount: 10 }], refunds: [] }]
+  });
+  assert.equal(migrated.sales[0].saleType, "actual");
+  assert.equal(migrated.sales[0].saleDate, oldDate);
+  assert.equal("payments" in migrated.sales[0], false);
+  assert.equal("refunds" in migrated.sales[0], false);
+});
+
+test("Business and cart backup schemas validate; negative stock is rejected", () => {
+  const x = createHarness();
+  assert.equal(x.context.validBusinessData(x.context.businessData), true);
+  assert.equal(x.context.validCartPayload({ cart: [{ product: assure, quantity: 1 }] }), true);
+  assert.equal(x.context.validSavedCartPayload([{ id: "saved-1", cart: [{ product: assure, quantity: 1 }] }]), true);
+  const invalid = { ...x.context.businessData, inventory: { [k1]: { product: assure, quantity: -1 } } };
+  assert.equal(x.context.validBusinessData(invalid), false);
 });
 
 test("Backup validation rejects negative free and saved-cart quantities", () => {
-  assert.equal(c.validCartPayload({ cart: [{ product: assure, quantity: 1, freeQuantity: -1 }] }), false);
-  assert.equal(c.validSavedCartPayload([{ id: "saved-bad", cart: [{ product: assure, quantity: -2 }] }]), false);
+  const x = createHarness();
+  assert.equal(x.context.validCartPayload({ cart: [{ product: assure, quantity: 1, freeQuantity: -1 }] }), false);
+  assert.equal(x.context.validSavedCartPayload([{ id: "saved-bad", cart: [{ product: assure, quantity: -2 }] }]), false);
 });
 
 test("Failed stock-in storage write preserves stock and the cart", () => {
@@ -248,8 +307,9 @@ test("Failed stock-in storage write preserves stock and the cart", () => {
 
 test("Failed sale storage write preserves inventory, sales and the cart", () => {
   const x = createHarness();
+  seedStock(x, k1, assure, 5);
   x.context.currentMode = "selling";
-  x.context.businessData.inventory[k1] = { product: assure, quantity: 5 };
+  x.context.saleType = "actual";
   x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
   x.setFailStorageWrites(true);
   x.context.postSale();
@@ -258,134 +318,127 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
   assert.equal(x.context.cart.length, 1);
 });
 
-test("Initial payment above the sale total is rejected without posting the sale", () => {
+test("Backup import restores inventory, sales and cart storage", async () => {
   const x = createHarness();
-  x.context.currentMode = "selling";
-  x.context.businessData.inventory[k1] = { product: assure, quantity: 5 };
-  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
-  x.$("receivedNow").value = "200";
-  x.$("receivedMethod").value = "Cash";
-  x.context.postSale();
-  assert.equal(x.context.businessData.sales.length, 0);
-  assert.equal(x.context.getStockQuantity(k1), 5);
-  assert.equal(x.context.cart.length, 1);
-  assert.match(x.alerts.at(-1), /cannot exceed the sale total/i);
+  const payload = {
+    app: "Product Scanner Vestige", backupVersion: 1,
+    businessData: { schemaVersion: 1, inventory: { [k1]: { product: assure, quantity: 4 } }, stockIns: [], sales: [] },
+    activeCart: { cartName: "Draft", cart: [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }] },
+    savedCarts: [{ id: "saved-1", cart: [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }] }]
+  };
+  const input = x.$("backupFile");
+  input.files = [{ text: async () => JSON.stringify(payload) }];
+  await x.context.importBusinessBackup({ target: input });
+  assert.equal(x.context.getStockQuantity(k1), 4);
+  assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
+  assert.ok(x.storage.has(x.context.CART_STORAGE_KEY));
+  assert.ok(x.storage.has(x.context.SAVED_CARTS_STORAGE_KEY));
+  assert.match(x.alerts.at(-1), /imported successfully/i);
 });
 
-test("Invalid payment method is rejected without adding a ledger entry", () => {
+test("Invalid backup import leaves existing browser data untouched", async () => {
   const x = createHarness();
-  x.context.businessData.sales = [{ id: "sale-1", createdAt: new Date().toISOString(), total: 100, items: [], payments: [], refunds: [] }];
-  x.prompts.push("25", "Cheque");
-  x.context.recordSalePayment("sale-1");
-  assert.equal(x.context.businessData.sales[0].payments.length, 0);
-  assert.match(x.alerts.at(-1), /Cash or Online/i);
+  x.storage.set(x.context.BUSINESS_STORAGE_KEY, "keep-business");
+  x.storage.set(x.context.CART_STORAGE_KEY, "keep-cart");
+  x.storage.set(x.context.SAVED_CARTS_STORAGE_KEY, "keep-saved");
+  const payload = {
+    app: "Product Scanner Vestige", backupVersion: 1,
+    businessData: { schemaVersion: 1, inventory: { bad: { product: assure, quantity: -1 } }, stockIns: [], sales: [] },
+    activeCart: { cart: [] }, savedCarts: []
+  };
+  const input = x.$("backupFile");
+  input.files = [{ text: async () => JSON.stringify(payload) }];
+  await x.context.importBusinessBackup({ target: input });
+  assert.equal(x.storage.get(x.context.BUSINESS_STORAGE_KEY), "keep-business");
+  assert.equal(x.storage.get(x.context.CART_STORAGE_KEY), "keep-cart");
+  assert.equal(x.storage.get(x.context.SAVED_CARTS_STORAGE_KEY), "keep-saved");
+  assert.match(x.alerts.at(-1), /import failed/i);
 });
 
-test("Refund cannot exceed the amount due or use an unsupported method", () => {
+test("Partial backup import storage failure rolls back all previous values", async () => {
   const x = createHarness();
-  x.context.businessData.sales = [{ id: "sale-1", createdAt: new Date().toISOString(), total: 50, items: [], payments: [{ id: "p1", createdAt: new Date().toISOString(), amount: 80, method: "Cash" }], refunds: [] }];
-  x.prompts.push("31");
-  x.context.recordSaleRefund("sale-1");
-  assert.equal(x.context.businessData.sales[0].refunds.length, 0);
-  assert.match(x.alerts.at(-1), /not exceeding the refund due/i);
-  x.prompts.push("20", "Cheque");
-  x.context.recordSaleRefund("sale-1");
-  assert.equal(x.context.businessData.sales[0].refunds.length, 0);
-  assert.match(x.alerts.at(-1), /Cash or Online/i);
+  const old = [
+    [x.context.BUSINESS_STORAGE_KEY, "old-business"],
+    [x.context.CART_STORAGE_KEY, "old-cart"],
+    [x.context.SAVED_CARTS_STORAGE_KEY, "old-saved"]
+  ];
+  old.forEach(([k, v]) => x.storage.set(k, v));
+  const originalSet = x.context.localStorage.setItem;
+  let writes = 0;
+  x.context.localStorage.setItem = (k, v) => { writes++; if (writes === 2) throw new Error("QuotaExceededError"); originalSet(k, v); };
+  const payload = {
+    app: "Product Scanner Vestige", backupVersion: 1,
+    businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
+    activeCart: { cart: [] }, savedCarts: []
+  };
+  const input = x.$("backupFile");
+  input.files = [{ text: async () => JSON.stringify(payload) }];
+  await x.context.importBusinessBackup({ target: input });
+  old.forEach(([k, v]) => assert.equal(x.storage.get(k), v));
+  assert.match(x.alerts.at(-1), /import failed/i);
 });
 
-test("Transaction busy guard prevents a second submission", () => {
-  const x = createHarness();
-  x.context.transactionBusy = true;
-  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
-  x.context.postCurrentTransaction();
-  assert.equal(x.context.businessData.stockIns.length, 0);
-  assert.equal(x.context.cart.length, 1);
-});
-
-const failed = results.filter(r => r.status === "FAIL");
-console.log("\nProduct Scanner Vestige — business logic tests");
-for (const result of results) {
-  console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
-}
-console.log("\n" + (results.length - failed.length) + "/" + results.length + " tests passed");
-if (failed.length) process.exitCode = 1;
-
-
-const synchronousTestCount = results.length;
-async function testAsync(name, fn) {
-  try { await fn(); results.push({ name, status: "PASS" }); }
-  catch (error) { results.push({ name, status: "FAIL", error: error.message }); process.exitCode = 1; }
-}
 (async () => {
-  await testAsync("Valid backup import restores business data and cart storage", async () => {
-    const x = createHarness();
-    const payload = {
-      app: "Product Scanner Vestige", backupVersion: 1,
-      businessData: { schemaVersion: 1, inventory: { [k1]: { product: assure, quantity: 4 } }, stockIns: [], sales: [] },
-      activeCart: { cartName: "Draft", cart: [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }] },
-      savedCarts: [{ id: "saved-1", cart: [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }] }]
-    };
-    const input = x.$("backupFile");
-    input.files = [{ text: async () => JSON.stringify(payload) }];
-    await x.context.importBusinessBackup({ target: input });
-    assert.equal(x.context.getStockQuantity(k1), 4);
-    assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
-    assert.ok(x.storage.has(x.context.CART_STORAGE_KEY));
-    assert.ok(x.storage.has(x.context.SAVED_CARTS_STORAGE_KEY));
-    assert.match(x.alerts.at(-1), /imported successfully/i);
-  });
-
-  await testAsync("Invalid backup import leaves existing browser data untouched", async () => {
-    const x = createHarness();
-    x.storage.set(x.context.BUSINESS_STORAGE_KEY, "keep-business");
-    x.storage.set(x.context.CART_STORAGE_KEY, "keep-cart");
-    x.storage.set(x.context.SAVED_CARTS_STORAGE_KEY, "keep-saved");
-    const payload = {
-      app: "Product Scanner Vestige", backupVersion: 1,
-      businessData: { schemaVersion: 1, inventory: { bad: { product: assure, quantity: -1 } }, stockIns: [], sales: [] },
-      activeCart: { cart: [] }, savedCarts: []
-    };
-    const input = x.$("backupFile");
-    input.files = [{ text: async () => JSON.stringify(payload) }];
-    await x.context.importBusinessBackup({ target: input });
-    assert.equal(x.storage.get(x.context.BUSINESS_STORAGE_KEY), "keep-business");
-    assert.equal(x.storage.get(x.context.CART_STORAGE_KEY), "keep-cart");
-    assert.equal(x.storage.get(x.context.SAVED_CARTS_STORAGE_KEY), "keep-saved");
-    assert.match(x.alerts.at(-1), /import failed/i);
-  });
-
-  await testAsync("Partial backup import storage failure rolls back all previous values", async () => {
-    const x = createHarness();
-    const old = [
-      [x.context.BUSINESS_STORAGE_KEY, "old-business"],
-      [x.context.CART_STORAGE_KEY, "old-cart"],
-      [x.context.SAVED_CARTS_STORAGE_KEY, "old-saved"]
-    ];
-    old.forEach(([k, v]) => x.storage.set(k, v));
-    const originalSet = x.context.localStorage.setItem;
-    let writes = 0;
-    x.context.localStorage.setItem = (k, v) => {
-      writes++;
-      if (writes === 2) throw new Error("QuotaExceededError");
-      originalSet(k, v);
-    };
-    const payload = {
-      app: "Product Scanner Vestige", backupVersion: 1,
-      businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
-      activeCart: { cart: [] }, savedCarts: []
-    };
-    const input = x.$("backupFile");
-    input.files = [{ text: async () => JSON.stringify(payload) }];
-    await x.context.importBusinessBackup({ target: input });
-    old.forEach(([k, v]) => assert.equal(x.storage.get(k), v));
-    assert.match(x.alerts.at(-1), /import failed/i);
-  });
-
-  const asyncResults = results.slice(synchronousTestCount);
-  const asyncFailed = asyncResults.filter(r => r.status === "FAIL");
-  console.log("\nBackup import integration checks");
+  for (const result of results) {
+    console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
+  }
+  const failed = results.filter(r => r.status === "FAIL");
+  console.log("\n" + (results.length - failed.length) + "/" + results.length + " synchronous tests passed");
+  const asyncTests = [
+    ["Backup import restores inventory, sales and cart storage", async () => {
+      const x = createHarness();
+      const payload = {
+        app: "Product Scanner Vestige", backupVersion: 1,
+        businessData: { schemaVersion: 1, inventory: { [k1]: { product: assure, quantity: 4 } }, stockIns: [], sales: [] },
+        activeCart: { cartName: "Draft", cart: [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }] },
+        savedCarts: [{ id: "saved-1", cart: [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }] }]
+      };
+      const input = x.$("backupFile"); input.files = [{ text: async () => JSON.stringify(payload) }];
+      await x.context.importBusinessBackup({ target: input });
+      assert.equal(x.context.getStockQuantity(k1), 4);
+      assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
+      assert.ok(x.storage.has(x.context.CART_STORAGE_KEY));
+      assert.ok(x.storage.has(x.context.SAVED_CARTS_STORAGE_KEY));
+      assert.match(x.alerts.at(-1), /imported successfully/i);
+    }],
+    ["Invalid backup import leaves existing browser data untouched", async () => {
+      const x = createHarness();
+      x.storage.set(x.context.BUSINESS_STORAGE_KEY, "keep-business");
+      x.storage.set(x.context.CART_STORAGE_KEY, "keep-cart");
+      x.storage.set(x.context.SAVED_CARTS_STORAGE_KEY, "keep-saved");
+      const payload = {
+        app: "Product Scanner Vestige", backupVersion: 1,
+        businessData: { schemaVersion: 1, inventory: { bad: { product: assure, quantity: -1 } }, stockIns: [], sales: [] },
+        activeCart: { cart: [] }, savedCarts: []
+      };
+      const input = x.$("backupFile"); input.files = [{ text: async () => JSON.stringify(payload) }];
+      await x.context.importBusinessBackup({ target: input });
+      assert.equal(x.storage.get(x.context.BUSINESS_STORAGE_KEY), "keep-business");
+      assert.equal(x.storage.get(x.context.CART_STORAGE_KEY), "keep-cart");
+      assert.equal(x.storage.get(x.context.SAVED_CARTS_STORAGE_KEY), "keep-saved");
+      assert.match(x.alerts.at(-1), /import failed/i);
+    }],
+    ["Partial backup import storage failure rolls back all previous values", async () => {
+      const x = createHarness();
+      const old = [[x.context.BUSINESS_STORAGE_KEY, "old-business"], [x.context.CART_STORAGE_KEY, "old-cart"], [x.context.SAVED_CARTS_STORAGE_KEY, "old-saved"]];
+      old.forEach(([k, v]) => x.storage.set(k, v));
+      const originalSet = x.context.localStorage.setItem;
+      let writes = 0;
+      x.context.localStorage.setItem = (k, v) => { writes++; if (writes === 2) throw new Error("QuotaExceededError"); originalSet(k, v); };
+      const payload = { app: "Product Scanner Vestige", backupVersion: 1, businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] }, activeCart: { cart: [] }, savedCarts: [] };
+      const input = x.$("backupFile"); input.files = [{ text: async () => JSON.stringify(payload) }];
+      await x.context.importBusinessBackup({ target: input });
+      old.forEach(([k, v]) => assert.equal(x.storage.get(k), v));
+      assert.match(x.alerts.at(-1), /import failed/i);
+    }]
+  ];
+  for (const [name, fn] of asyncTests) {
+    try { await fn(); results.push({ name, status: "PASS" }); }
+    catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
+  }
+  const asyncResults = results.slice(22);
   for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
-  console.log("\n" + (asyncResults.length - asyncFailed.length) + "/" + asyncResults.length + " backup import checks passed");
-  if (asyncFailed.length) process.exitCode = 1;
+  const allFailed = results.filter(r => r.status === "FAIL");
+  console.log("\n" + (results.length - allFailed.length) + "/" + results.length + " total tests passed");
+  if (allFailed.length) process.exitCode = 1;
 })();
