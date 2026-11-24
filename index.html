@@ -1686,9 +1686,9 @@ function renderCart() {
         <div class="cart-item-prices">
           <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
           <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
-          ${currentMode==="selling" ? '<span style="color:#9be2b6">Available: '+getStockQuantity(item.key)+'</span>' : ''}
+          ${currentMode==="selling" ? '<span style="color:var(--accent-soft)">Available: '+getStockQuantity(item.key)+'</span>' : ''}
         </div>
-        ${currentMode==="selling" ? '<div class="business-muted" style="margin-top:7px">Free qty <input class="free-quantity" type="number" min="0" step="1" value="'+Math.max(0,Number(item.freeQuantity)||0)+'" data-free-key="'+escapeHtml(item.key)+'" aria-label="Free quantity"></div>' : ''}
+        ${currentMode==="selling" ? '<div class="business-muted" style="margin-top:7px">Paid: '+paidQuantity+' · Free: '+freeQuantity+'</div><div class="business-muted" style="margin-top:5px">Free qty <input class="free-quantity" type="number" min="0" max="'+quantity+'" step="1" value="'+freeQuantity+'" data-free-key="'+escapeHtml(item.key)+'" aria-label="Free quantity"></div>' : ''}
 
       </div>
 
@@ -2456,9 +2456,9 @@ $("cartList").addEventListener("change",event=>{
   const item=cart.find(entry=>entry.key===input.dataset.freeKey); if(!item)return;
   const n=Number(input.value);
   if(!Number.isInteger(n)||n<0){alert("Free quantity must be a whole number of zero or more.");input.value=item.freeQuantity||0;return;}
-  if(currentMode==="selling"&&Number(item.quantity)+n>getSaleStockLimit(item.key)){alert("Paid plus free quantity cannot exceed available stock.");input.value=item.freeQuantity||0;return;}
+  if(n>Number(item.quantity)){alert("Free quantity cannot be greater than the total cart quantity.");input.value=item.freeQuantity||0;return;}
   item.freeQuantity=n;
-  if(item.quantity===0&&n===0)cart=cart.filter(entry=>entry!==item);
+  if(item.quantity===0)cart=cart.filter(entry=>entry!==item);
   saveCartToStorage();renderCart();
 });
 
@@ -2557,9 +2557,9 @@ function postSale(){
   let oldSale=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;
   if(editingSaleId&&!oldSale){alert("Sale not found. Reload and try again.");return;}
   if(oldSale&&Date.now()-new Date(oldSale.createdAt).getTime()>7*86400000){alert("Sales can only be edited within 7 days of the original sale.");return;}
-  for(const i of items){const old=oldSale?.items?.find(x=>x.key===i.key),available=getStockQuantity(i.key)+(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),needed=Number(i.quantity)+Number(i.freeQuantity||0);if(needed>available){alert("Insufficient stock for "+i.product.name+". Available: "+available+", required: "+needed+".");return;}}
+  for(const i of items){const old=oldSale?.items?.find(x=>x.key===i.key),available=getStockQuantity(i.key)+(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),needed=Number(i.quantity),free=Number(i.freeQuantity)||0;if(free>needed){alert("Free quantity cannot exceed total quantity for "+i.product.name+".");return;}if(needed>available){alert("Insufficient stock for "+i.product.name+". Available: "+available+", required: "+needed+".");return;}}
   const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData));let sale=editingSaleId?next.sales.find(s=>s.id===editingSaleId):null;
-  const oldItems=sale?sale.items:[],newItems=items.map(i=>({...productSnapshot(i),quantity:Number(i.quantity),freeQuantity:Number(i.freeQuantity)||0}));
+  const oldItems=sale?sale.items:[],newItems=items.map(i=>({...productSnapshot(i),quantity:Math.max(0,Number(i.quantity)-(Number(i.freeQuantity)||0)),freeQuantity:Number(i.freeQuantity)||0}));
   const keys=new Set([...oldItems.map(i=>i.key),...newItems.map(i=>i.key)]);
   for(const key of keys){const old=oldItems.find(i=>i.key===key),fresh=newItems.find(i=>i.key===key),oldQ=(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),newQ=(Number(fresh?.quantity)||0)+(Number(fresh?.freeQuantity)||0),delta=newQ-oldQ,current=Number(next.inventory[key]?.quantity)||0;
     if(delta>current){alert("Insufficient stock to add more units of "+(fresh?.product.name||old?.product.name)+".");return;}
@@ -2591,7 +2591,7 @@ function recordSaleRefund(id){
 function beginSaleEdit(id){
   const s=businessData.sales.find(x=>x.id===id);if(!s)return;if(Date.now()-new Date(s.createdAt).getTime()>7*86400000)return alert("This sale is older than 7 days and cannot be edited.");
   if(cart.length&&!confirm("Replace the current cart with this sale for editing?"))return;
-  editingSaleId=id;setBusinessMode("selling");cart=(s.items||[]).map(i=>({key:i.key,product:i.product,quantity:Number(i.quantity)||0,freeQuantity:Number(i.freeQuantity)||0}));cartName=s.customerName||"";$("cartName").value=cartName;$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();$("cartSection").scrollIntoView({behavior:"smooth",block:"start"});setStatus("Editing sale. Previous payments and refunds will be preserved.");
+  editingSaleId=id;setBusinessMode("selling");cart=(s.items||[]).map(i=>({key:i.key,product:i.product,quantity:(Number(i.quantity)||0)+(Number(i.freeQuantity)||0),freeQuantity:Number(i.freeQuantity)||0,quantityIncludesFree:true}));cartName=s.customerName||"";$("cartName").value=cartName;$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();$("cartSection").scrollIntoView({behavior:"smooth",block:"start"});setStatus("Editing sale. Previous payments and refunds will be preserved.");
 }
 function handleSalesHistoryClick(e){const b=e.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="payment")recordSalePayment(id);if(b.dataset.saleAction==="refund")recordSaleRefund(id);if(b.dataset.saleAction==="edit")beginSaleEdit(id);}
 function exportBusinessBackup(){
@@ -3601,6 +3601,36 @@ function scanAnotherProduct() {
 }
 
 // ==========================================
+// THEME PREFERENCE
+// ==========================================
+
+function applyTheme(theme){
+  const selected=theme==="dark"?"dark":"light";
+  document.documentElement.dataset.theme=selected;
+  const button=$("themeToggleBtn");
+  if(button){
+    button.innerHTML=selected==="light"
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>';
+    button.setAttribute("aria-label",selected==="light"?"Switch to dark theme":"Switch to light theme");
+    button.title=selected==="light"?"Switch to dark theme":"Switch to light theme";
+  }
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.content=selected==="light"?"#f5f7f6":"#123b2a";
+}
+function initializeTheme(){
+  let theme="light";
+  try{const saved=localStorage.getItem("psv-theme");if(saved==="dark"||saved==="light")theme=saved;}catch(error){}
+  applyTheme(theme);
+}
+
+$("themeToggleBtn").addEventListener("click",()=>{
+  const next=document.documentElement.dataset.theme==="dark"?"light":"dark";
+  applyTheme(next);
+  try{localStorage.setItem("psv-theme",next);}catch(error){}
+});
+
+// ==========================================
 // EVENT LISTENERS
 // ==========================================
 
@@ -3622,6 +3652,7 @@ $("scanAgainBtn").addEventListener(
 // INITIALIZATION
 // ==========================================
 
+initializeTheme();
 loadCartFromStorage();
 loadSavedCartsFromStorage();
 initializeBusinessFeatures();
