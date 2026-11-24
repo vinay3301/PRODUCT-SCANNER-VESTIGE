@@ -856,6 +856,8 @@ button:disabled {
 
     <div class="business-actions" style="margin-top:14px"><button class="primary" id="postTransactionBtn" type="button" disabled style="width:100%">SAVE STOCK-IN</button></div>
 
+    <div class="business-list hidden" id="salesHistoryList"></div>
+
     <!-- BUTTONS IN THE REQUESTED 2 x 2 ORDER -->
 
     <div class="cart-actions">
@@ -1052,14 +1054,23 @@ async function loadProducts() {
 
     try {
 
-      const response = await fetch(API_URL, {
-        method:"GET",
-        mode:"cors",
-        cache:"no-store",
-        headers:{
-          "Accept":"application/json"
-        }
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      let response;
+      try {
+        response = await fetch(API_URL, {
+          method:"GET",
+          mode:"cors",
+          cache:"no-store",
+          signal:controller.signal,
+          headers:{
+            "Accept":"application/json"
+          }
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         throw new Error("API returned HTTP " + response.status);
@@ -1099,10 +1110,11 @@ async function loadProducts() {
       $("apiBadge").textContent = "API not connected";
       $("apiBadge").style.borderColor = "#a64b4b";
 
-      setStatus(
-        "Product API error: " +
-        (error?.message || String(error))
-      );
+      const message = error?.name === "AbortError"
+        ? "Request timed out after 15 seconds."
+        : (error?.message || String(error));
+
+      setStatus("Product API error: " + message);
 
       return false;
     }
@@ -2500,11 +2512,14 @@ function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true
 function setupSalesUI(){
   const style=document.createElement("style");
   style.textContent=".business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.sale-type-switch button{background:var(--secondary-bg);color:var(--subtle-text);border:1px solid var(--line);min-height:48px}.sale-type-switch button.active{background:var(--green);color:var(--primary-text);border-color:var(--green)}.sale-type-switch small{display:block;font-size:11px;font-weight:500;margin-top:3px}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:grid;grid-template-columns:minmax(0,4fr) minmax(82px,1fr);gap:8px;margin:12px 0}.sale-product-picker select,.sale-date-field input{width:100%;min-width:0;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}.sale-product-picker button{min-width:0;padding:9px 5px;font-size:12px}.sale-date-field{margin:10px 0}.sale-date-field label{display:block;font-size:13px;color:var(--muted);font-weight:650;margin-bottom:6px}.sale-history-heading{margin:18px 0 10px}.sale-history-heading h3{font-size:17px;margin:0}.history-card .business-actions{display:flex;flex-wrap:wrap}.history-card .business-actions button{flex:1 1 110px}.danger-action{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}@media(max-width:420px){.business-stat strong,.sales-overview .business-stat strong{font-size:18px}}";
-  document.head.querySelector("style").appendChild(style);
+  document.head.appendChild(style);
   const mrp=$("stockMrpValue");if(mrp)mrp.closest(".business-stat").remove();
-  const history=$("salesHistoryList"),section=document.createElement("section");
+  const history=$("salesHistoryList") || document.createElement("div");
+  history.id="salesHistoryList";
+  history.classList.remove("hidden");
+  const section=document.createElement("section");
   section.id="salesHistorySection";section.className="hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div>';
-  history.classList.remove("hidden");section.appendChild(history);$("postTransactionBtn").insertAdjacentElement("afterend",section);
+  section.appendChild(history);$("postTransactionBtn").insertAdjacentElement("afterend",section);
   const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
   controls.innerHTML='<div class="sale-type-switch" role="group" aria-label="Sale type"><button type="button" id="actualSaleBtn" class="active">Actual Sale<small>Deducts stock</small></button><button type="button" id="recordSaleBtn">Record Sale<small>Does not deduct stock</small></button></div><div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">Add Selected</button></div>';
   $("cartName").insertAdjacentElement("afterend",controls);
