@@ -24,6 +24,7 @@ function createHarness() {
       elements.set(id, {
         value: "", textContent: "", innerHTML: "", disabled: false, files: [],
         classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} },
+        setAttribute: () => {},
         addEventListener: () => {}, previousElementSibling: { textContent: "" },
         querySelector: () => ({ textContent: "" }), scrollIntoView: () => {}
       });
@@ -405,6 +406,7 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
   }
   const failed = results.filter(r => r.status === "FAIL");
   console.log("\n" + (results.length - failed.length) + "/" + results.length + " synchronous tests passed");
+  const asyncStart = results.length;
   const asyncTests = [
     ["Backup import restores inventory, sales and cart storage", async () => {
       const x = createHarness();
@@ -457,7 +459,7 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
     try { await fn(); results.push({ name, status: "PASS" }); }
     catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
   }
-  const asyncResults = results.slice(21);
+  const asyncResults = results.slice(asyncStart);
   for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
   const allFailed = results.filter(r => r.status === "FAIL");
   console.log("\n" + (results.length - allFailed.length) + "/" + results.length + " total tests passed");
