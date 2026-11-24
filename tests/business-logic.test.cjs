@@ -72,6 +72,12 @@ const conditioner = product("ASSURE HAIR CONDITIONER", 330, 280, 2.9);
 const k1 = "assure enchant body talk";
 const k2 = "assure hair conditioner";
 
+test("All inline JavaScript blocks in the page have valid syntax", () => {
+  const blocks = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(m => m[1]).filter(code => code.trim());
+  assert.ok(blocks.length > 0, "No inline JavaScript blocks found");
+  blocks.forEach((code, index) => new vm.Script(code, { filename: "index.html inline script " + (index + 1) }));
+});
+
 test("Stock-in adds quantity and creates history", () => {
   c.cart = [{ key: k1, product: assure, quantity: 5, freeQuantity: 0 }];
   c.postStockIn();
