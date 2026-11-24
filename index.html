@@ -859,43 +859,7 @@ button:disabled {
 
     <div class="business-list hidden" id="salesHistoryList"></div>
 
-    <!-- BUTTONS IN THE REQUESTED 2 x 2 ORDER -->
-
-    <div class="cart-actions">
-
-      <button class="save-cart-btn" id="saveCartBtn" type="button" disabled>
-        SAVE CART
-      </button>
-
-      <button class="view-saved-btn" id="viewSavedBtn" type="button">
-        VIEW SAVED CARTS
-      </button>
-
-      <button class="export-cart-btn" id="exportCartBtn" type="button" disabled>
-        EXPORT CART
-      </button>
-
-      <button class="clear-cart-btn" id="clearCartBtn" type="button" disabled>
-        CLEAR CURRENT CART
-      </button>
-
-    </div>
-
-    <section class="saved-section hidden" id="savedSection">
-      <div class="saved-heading">
-        <h2>Saved Carts</h2>
-
-        <button class="close-saved-btn" id="closeSavedBtn" type="button">
-          Close
-        </button>
-      </div>
-
-      <div id="savedEmpty" class="saved-empty">
-        No saved carts yet.
-      </div>
-
-      <div class="saved-list" id="savedList"></div>
-    </section>
+    
 
   </section>
 
@@ -2427,31 +2391,6 @@ $("cartName").addEventListener("input", () => {
   saveCartToStorage();
 });
 
-$("saveCartBtn").addEventListener("click", saveCurrentCart);
-
-$("exportCartBtn").addEventListener("click", exportCurrentCart);
-
-$("viewSavedBtn").addEventListener("click", () => {
-
-  renderSavedCarts();
-
-  $("savedSection").classList.toggle("hidden");
-
-  if (!$("savedSection").classList.contains("hidden")) {
-
-    $("savedSection").scrollIntoView({
-      behavior:"smooth",
-      block:"nearest"
-    });
-  }
-});
-
-$("closeSavedBtn").addEventListener("click", () => {
-  $("savedSection").classList.add("hidden");
-});
-
-$("clearCartBtn").addEventListener("click", clearEntireCart);
-
 $("addToCartBtn").addEventListener("click",addSelectedProductToCart);
 $("postTransactionBtn").addEventListener("click",postCurrentTransaction);
 $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
@@ -2553,7 +2492,6 @@ function setupSalesUI(){
   const oldCartActions=$("cartSection").querySelector(".cart-actions");if(oldCartActions)oldCartActions.remove();
   const savedSection=$("savedSection");if(savedSection)savedSection.remove();
   ["saveCartBtn","viewSavedBtn","exportCartBtn","clearCartBtn"].forEach(id=>{const el=$(id);if(el)el.remove();});
-  const oldPanel=$("salesPanel");if(oldPanel)oldPanel.remove();
   const oldPanel=$("salesPanel");if(oldPanel)oldPanel.remove();
   $("saleDateInput").value=formatLocalDateTimeInput(new Date());
 }
