@@ -2460,20 +2460,9 @@ $("cartList").addEventListener("change",event=>{
 });
 
 // ==========================================
-// DEALER STOCK, SALES, PAYMENT LEDGERS AND BACKUP
+// DEALER STOCK, SALES AND BACKUP
 // ==========================================
 function emptyBusinessData(){return {schemaVersion:1,inventory:{},stockIns:[],sales:[]};}
-function validBusinessData(d){
-  if(!d||d.schemaVersion!==1||!d.inventory||typeof d.inventory!=="object"||Array.isArray(d.inventory)||!Array.isArray(d.stockIns)||!Array.isArray(d.sales))return false;
-  const validProduct=p=>p&&typeof p.name==="string"&&Number.isFinite(Number(p.MRP))&&Number.isFinite(Number(p.DP))&&Number.isFinite(Number(p.pv));
-  const validLine=i=>i&&typeof i.key==="string"&&validProduct(i.product);
-  const validQty=q=>Number.isFinite(Number(q))&&Number(q)>=0;
-  const validLedgerEntry=e=>e&&typeof e.id==="string"&&typeof e.createdAt==="string"&&Number.isFinite(Number(e.amount))&&Number(e.amount)>0&&["Cash","Online"].includes(e.method);
-  if(!Object.values(d.inventory).every(i=>i&&validProduct(i.product)&&validQty(i.quantity)))return false;
-  if(!d.stockIns.every(r=>r&&typeof r.id==="string"&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>0)))return false;
-  if(!d.sales.every(r=>r&&typeof r.id==="string"&&typeof r.createdAt==="string"&&Number.isFinite(Number(r.total))&&Number(r.total)>=0&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&validQty(i.quantity)&&validQty(i.freeQuantity??0))&&Array.isArray(r.payments)&&r.payments.every(validLedgerEntry)&&Array.isArray(r.refunds)&&r.refunds.every(validLedgerEntry)))return false;
-  return true;
-}
 function validCartItem(i){return !!i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0&&Number.isFinite(Number(i.freeQuantity??0))&&Number(i.freeQuantity??0)>=0;}
 function validCartPayload(c){return !!c&&typeof c==="object"&&Array.isArray(c.cart)&&c.cart.every(validCartItem);}
 function validSavedCartPayload(list){return Array.isArray(list)&&list.every(s=>s&&typeof s.id==="string"&&Array.isArray(s.cart)&&s.cart.every(validCartItem));}
@@ -2481,11 +2470,6 @@ function makeRecordId(){return Date.now().toString(36)+Math.random().toString(36
 function saveBusinessData(next){
   try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(next));businessData=next;return true;}
   catch(e){console.error(e);setStatus("Could not save business data. Check browser storage space.");return false;}
-}
-function loadBusinessData(){
-  try{const raw=localStorage.getItem(BUSINESS_STORAGE_KEY);if(!raw){businessData=emptyBusinessData();return;}
-    const d=JSON.parse(raw);if(!validBusinessData(d))throw new Error("Invalid business data");businessData=d;
-  }catch(e){console.error(e);businessData=emptyBusinessData();setStatus("Business data could not be read. Import a valid backup to restore it.");}
 }
 function getStockQuantity(key){return Math.max(0,Number(businessData.inventory[key]?.quantity)||0);}
 function getSaleStockLimit(key){
@@ -2499,45 +2483,10 @@ function getSaleStockLimit(key){
 }
 function productSnapshot(item){return {key:item.key,product:{name:String(item.product.name||""),MRP:numericValue(item.product.MRP),DP:numericValue(item.product.DP),pv:numericValue(item.product.pv)}};}
 function getInventoryTotals(){return Object.values(businessData.inventory).reduce((t,i)=>{const q=Math.max(0,Number(i.quantity)||0);t.mrp+=numericValue(i.product?.MRP)*q;t.dp+=numericValue(i.product?.DP)*q;t.pv+=numericValue(i.product?.pv)*q;return t;},{mrp:0,dp:0,pv:0});}
-function renderInventory(){
-  const t=getInventoryTotals();$("stockMrpValue").textContent=formatCartMoney(t.mrp);$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
-  const el=$("stockList");if(el&&!el.classList.contains("hidden")){
-    const rows=Object.entries(businessData.inventory).filter(([,i])=>Number(i.quantity)>0).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
-    el.innerHTML=rows.length?rows.map(([k,i])=>'<div class="business-row"><div><strong>'+escapeHtml(i.product.name)+'</strong><small>MRP '+escapeHtml(formatMoney(i.product.MRP))+' · DP '+escapeHtml(formatMoney(i.product.DP))+' · PV '+escapeHtml(i.product.pv??0)+'</small></div><strong>'+Number(i.quantity)+'</strong></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
-  }
-}
 function renderStockHistory(){
   const el=$("stockHistoryList");const records=businessData.stockIns||[];
   el.innerHTML=records.length?records.map(r=>{const d=new Date(r.createdAt);const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" × "+i.quantity+" (MRP "+formatMoney(i.product.MRP)+", DP "+formatMoney(i.product.DP)+", PV "+i.product.pv+")").join("<br>");
     return '<div class="history-card"><strong>'+escapeHtml(r.name||"Stock-in")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>DP value: '+formatCartMoney(r.totalDP)+' · MRP '+formatCartMoney(r.totalMRP)+' · PV '+Number(r.totalPV||0).toLocaleString("en-IN")+'</strong></div></div>';}).join(""):'<div class="business-muted">No stock-in history yet.</div>';
-}
-function renderSalesHistory(){
-  const el=$("salesHistoryList");const records=businessData.sales||[];
-  el.innerHTML=records.length?records.map(r=>{
-    const gross=(r.payments||[]).reduce((s,p)=>s+Number(p.amount||0),0),refund=(r.refunds||[]).reduce((s,p)=>s+Number(p.amount||0),0),net=gross-refund,balance=Number(r.total||0)-net;
-    const status=balance>0.009?(net<=0?"Unpaid":"Partially paid"):(balance< -0.009?"Refund due":"Paid");
-    const d=new Date(r.createdAt),canEdit=Date.now()-d.getTime()<=7*86400000;
-    const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" · paid "+i.quantity+" · free "+(i.freeQuantity||0)).join("<br>");
-    const ledger=[...(r.payments||[]).map(p=>({kind:"Payment",...p})),...(r.refunds||[]).map(p=>({kind:"Refund",...p}))].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-    const ledgerHtml=ledger.map(p=>escapeHtml(p.kind)+" "+formatCartMoney(p.amount)+" · "+escapeHtml(p.method)+" · "+escapeHtml(new Date(p.createdAt).toLocaleString("en-IN"))).join("<br>");
-    const revisionHtml=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
-    return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>Sale '+formatCartMoney(r.total)+' · Net received '+formatCartMoney(net)+' · Balance '+formatCartMoney(balance)+' · '+status+'</strong>'+(ledgerHtml?'<br><br>'+ledgerHtml:'')+(revisionHtml?'<br><br>'+revisionHtml:'')+'</div><div class="business-actions"><button data-sale-action="payment" data-sale-id="'+escapeHtml(r.id)+'">Add payment</button><button data-sale-action="refund" data-sale-id="'+escapeHtml(r.id)+'">Record refund</button>'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / return</button>':'')+'</div></div>';
-  }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
-}
-function setBusinessMode(mode){
-  const requested=mode==="selling"?"selling":"stocking";
-  if(editingSaleId&&requested!=="selling"){alert("Finish or cancel the sale edit before switching to Stocking mode.");return;}
-  if(requested!==currentMode&&cart.length&&!editingSaleId){
-    if(!confirm("You have an unsaved cart. Switching modes will clear it. Continue?"))return;
-    cart=[];cartName="";$("cartName").value="";saveCartToStorage();
-  }
-  currentMode=requested;
-  $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
-  $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("salesPanel").classList.toggle("hidden",currentMode!=="selling");
-  $("cartName").previousElementSibling.textContent=currentMode==="stocking"?"Stock-in reference (optional)":"Customer name (optional)";
-  $("cartName").placeholder=currentMode==="stocking"?"Optional stock-in note":"Enter customer name";
-  $("cartSection").querySelector("h2").textContent=currentMode==="stocking"?"Stock-In Cart":"Selling Cart";
-  renderCart();renderInventory();if(currentMode==="selling")renderSalesHistory();
 }
 function postStockIn(){
   const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add at least one product with a positive quantity.");return;}
@@ -2547,50 +2496,7 @@ function postStockIn(){
   next.stockIns.unshift({id:makeRecordId(),name:cartName.trim()||"Stock-in",createdAt:now,items:snapshot,totalDP:snapshot.reduce((s,i)=>s+i.product.DP*i.quantity,0),totalMRP:snapshot.reduce((s,i)=>s+i.product.MRP*i.quantity,0),totalPV:snapshot.reduce((s,i)=>s+i.product.pv*i.quantity,0)});
   if(!saveBusinessData(next))return;cart=[];cartName="";$("cartName").value="";saveCartToStorage();renderCart();renderInventory();renderStockHistory();setStatus("Stock-in saved. Available stock has increased.");
 }
-function saleTotal(items){return items.reduce((s,i)=>s+numericValue(i.product.DP)*Number(i.quantity),0);}
-function postSale(){
-  const items=cart.filter(i=>Number(i.quantity)>0||Number(i.freeQuantity)>0);if(!items.length){alert("Add products before saving the sale.");return;}
-  let oldSale=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;
-  if(editingSaleId&&!oldSale){alert("Sale not found. Reload and try again.");return;}
-  if(oldSale&&Date.now()-new Date(oldSale.createdAt).getTime()>7*86400000){alert("Sales can only be edited within 7 days of the original sale.");return;}
-  for(const i of items){const old=oldSale?.items?.find(x=>x.key===i.key),available=getStockQuantity(i.key)+(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),needed=Number(i.quantity),free=Number(i.freeQuantity)||0;if(free>needed){alert("Free quantity cannot exceed total quantity for "+i.product.name+".");return;}if(needed>available){alert("Insufficient stock for "+i.product.name+". Available: "+available+", required: "+needed+".");return;}}
-  const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData));let sale=editingSaleId?next.sales.find(s=>s.id===editingSaleId):null;
-  const oldItems=sale?sale.items:[],newItems=items.map(i=>({...productSnapshot(i),quantity:Math.max(0,Number(i.quantity)-(Number(i.freeQuantity)||0)),freeQuantity:Number(i.freeQuantity)||0}));
-  const keys=new Set([...oldItems.map(i=>i.key),...newItems.map(i=>i.key)]);
-  for(const key of keys){const old=oldItems.find(i=>i.key===key),fresh=newItems.find(i=>i.key===key),oldQ=(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),newQ=(Number(fresh?.quantity)||0)+(Number(fresh?.freeQuantity)||0),delta=newQ-oldQ,current=Number(next.inventory[key]?.quantity)||0;
-    if(delta>current){alert("Insufficient stock to add more units of "+(fresh?.product.name||old?.product.name)+".");return;}
-    next.inventory[key]={product:fresh?.product||old?.product,quantity:current-delta,updatedAt:now};
-  }
-  const total=saleTotal(newItems);
-  if(!sale){sale={id:makeRecordId(),createdAt:now,customerName:cartName.trim(),items:newItems,total,payments:[],refunds:[],revisions:[]};next.sales.unshift(sale);}
-  else{sale.revisions=Array.isArray(sale.revisions)?sale.revisions:[];sale.revisions.push({revisedAt:now,previousTotal:sale.total,previousItems:JSON.parse(JSON.stringify(sale.items))});sale.items=newItems;sale.total=total;sale.updatedAt=now;sale.customerName=cartName.trim()||sale.customerName||"";}
-  if(!editingSaleId){const received=Math.round(Math.max(0,Number($("receivedNow").value)||0)*100)/100,method=$("receivedMethod").value;if(received>0){if(!method){alert("Choose Cash or Online for the amount received.");return;}if(received>total+0.001){alert("Amount received cannot exceed the sale total.");return;}recordPayment(sale,received,method);}}
-  if(!saveBusinessData(next))return;editingSaleId=null;cart=[];cartName="";$("cartName").value="";$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();renderInventory();renderSalesHistory();setStatus("Sale saved. Stock adjusted; payment status is shown in Sales history.");
-}
 function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(currentMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;$("postTransactionBtn").disabled=!cart.length;}}
-function beginSaleEdit(id){
-  const s=businessData.sales.find(x=>x.id===id);if(!s)return;if(Date.now()-new Date(s.createdAt).getTime()>7*86400000)return alert("This sale is older than 7 days and cannot be edited.");
-  if(cart.length&&!confirm("Replace the current cart with this sale for editing?"))return;
-  editingSaleId=id;setBusinessMode("selling");cart=(s.items||[]).map(i=>({key:i.key,product:i.product,quantity:(Number(i.quantity)||0)+(Number(i.freeQuantity)||0),freeQuantity:Number(i.freeQuantity)||0,quantityIncludesFree:true}));cartName=s.customerName||"";$("cartName").value=cartName;$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();$("cartSection").scrollIntoView({behavior:"smooth",block:"start"});setStatus("Editing sale. Previous payments and refunds will be preserved.");
-}
-function handleSalesHistoryClick(e){const b=e.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="payment")recordSalePayment(id);if(b.dataset.saleAction==="refund")recordSaleRefund(id);if(b.dataset.saleAction==="edit")beginSaleEdit(id);}
-function exportBusinessBackup(){
-  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData,activeCart:{cartName,cart},savedCarts};
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="product-scanner-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);setStatus("Backup exported to this device.");
-}
-async function importBusinessBackup(e){
-  const input=e.target,file=input.files?.[0];if(!file)return;
-  try{const p=JSON.parse(await file.text());if(p?.app!=="Product Scanner Vestige"||p.backupVersion!==1||!validBusinessData(p.businessData)||!validCartPayload(p.activeCart||{cart:[]})||!validSavedCartPayload(p.savedCarts||[]))throw new Error("Unsupported or invalid Product Scanner backup.");
-    if(!confirm("Import this backup and replace the stock, history, payments, refunds, active cart and saved carts in this browser? This cannot be undone."))return;
-    const old={b:localStorage.getItem(BUSINESS_STORAGE_KEY),c:localStorage.getItem(CART_STORAGE_KEY),s:localStorage.getItem(SAVED_CARTS_STORAGE_KEY)};
-    try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(p.businessData));localStorage.setItem(CART_STORAGE_KEY,JSON.stringify(p.activeCart||{cartName:"",cart:[]}));localStorage.setItem(SAVED_CARTS_STORAGE_KEY,JSON.stringify(Array.isArray(p.savedCarts)?p.savedCarts:[]));}
-    catch(err){try{old.b===null?localStorage.removeItem(BUSINESS_STORAGE_KEY):localStorage.setItem(BUSINESS_STORAGE_KEY,old.b);old.c===null?localStorage.removeItem(CART_STORAGE_KEY):localStorage.setItem(CART_STORAGE_KEY,old.c);old.s===null?localStorage.removeItem(SAVED_CARTS_STORAGE_KEY):localStorage.setItem(SAVED_CARTS_STORAGE_KEY,old.s);}catch(rollback){console.error(rollback);}throw err;}
-    businessData=p.businessData;loadCartFromStorage();loadSavedCartsFromStorage();renderInventory();renderStockHistory();renderSalesHistory();alert("Backup imported successfully.");setStatus("Backup restored in this browser.");
-  }catch(err){alert("Backup import failed: "+(err?.message||String(err)));}finally{input.value="";}
-}
-function initializeBusinessFeatures(){loadBusinessData();$("salesHistoryList").addEventListener("click",handleSalesHistoryClick);setBusinessMode("stocking");renderStockHistory();renderSalesHistory();}
-
-// ==========================================
 // PRODUCT MATCHING
 // ==========================================
 
