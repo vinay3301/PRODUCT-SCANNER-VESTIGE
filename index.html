@@ -780,7 +780,7 @@ button:disabled {
   </section>
 
   <div class="mode-switch" role="group" aria-label="Work mode">
-    <button type="button" id="stockingModeBtn" class="active">Stocking</button>
+    <button type="button" id="stockingModeBtn" class="active">Stock</button>
     <button type="button" id="sellingModeBtn">Selling</button>
   </div>
 
@@ -793,6 +793,7 @@ button:disabled {
     <div class="business-actions">
       <button type="button" id="toggleStockListBtn">View stock list</button>
       <button type="button" id="toggleStockHistoryBtn">Stock-in history</button>
+      <button type="button" id="clearStockBtn" class="clear-stock-btn">CLEAR STOCK</button>
     </div>
     <div class="business-list hidden" id="stockList"></div>
     <div class="business-list hidden" id="stockHistoryList"></div>
@@ -978,6 +979,7 @@ let cartName = "";
 let savedCarts = [];
 let businessData = {schemaVersion:1,inventory:{},stockIns:[],sales:[]};
 let currentMode = "stocking";
+let cartMode = "stocking";
 let editingSaleId = null;
 let transactionBusy = false;
 
@@ -2511,18 +2513,28 @@ function postStockIn(){
 function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(currentMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;$("postTransactionBtn").disabled=!cart.length;}}
 function setupSalesUI(){
   const style=document.createElement("style");
-  style.textContent=".business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.sale-type-switch button{background:var(--secondary-bg);color:var(--subtle-text);border:1px solid var(--line);min-height:48px}.sale-type-switch button.active{background:var(--green);color:var(--primary-text);border-color:var(--green)}.sale-type-switch small{display:block;font-size:11px;font-weight:500;margin-top:3px}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:grid;grid-template-columns:minmax(0,4fr) minmax(82px,1fr);gap:8px;margin:12px 0}.sale-product-picker select,.sale-date-field input{width:100%;min-width:0;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}.sale-product-picker button{min-width:0;padding:9px 5px;font-size:12px}.sale-date-field{margin:10px 0}.sale-date-field label{display:block;font-size:13px;color:var(--muted);font-weight:650;margin-bottom:6px}.sale-history-heading{margin:18px 0 10px}.sale-history-heading h3{font-size:17px;margin:0}.history-card .business-actions{display:flex;flex-wrap:wrap}.history-card .business-actions button{flex:1 1 110px}.danger-action{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}@media(max-width:420px){.business-stat strong,.sales-overview .business-stat strong{font-size:18px}}";
+  style.textContent=".business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--secondary-bg);flex:none}.sale-type-toggle button{padding:6px 11px;min-height:30px;border-radius:999px;background:transparent;color:var(--subtle-text);font-size:11px;line-height:1.1}.sale-type-toggle button.active{background:var(--green);color:var(--primary-text)}.sale-heading-right{display:flex;align-items:center;gap:8px;min-width:0}.clear-stock-btn{font-size:10px!important;min-height:30px!important;padding:5px 9px!important;justify-self:end;background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}.stock-quantity-controls{display:flex;align-items:center;gap:6px}.stock-quantity-controls button{width:32px;height:32px;min-height:32px;padding:0;border-radius:8px;font-size:18px}.stock-quantity-controls strong{min-width:20px;text-align:center}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:grid;grid-template-columns:minmax(0,4fr) minmax(82px,1fr);gap:8px;margin:12px 0}.sale-product-picker select,.sale-date-field input{width:100%;min-width:0;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}.sale-product-picker button{min-width:0;padding:9px 5px;font-size:12px}.sale-date-field{margin:10px 0}.sale-date-field label{display:block;font-size:13px;color:var(--muted);font-weight:650;margin-bottom:6px}.sale-history-heading{margin:18px 0 10px}.sale-history-heading h3{font-size:17px;margin:0}.history-card .business-actions{display:flex;flex-wrap:wrap}.history-card .business-actions button{flex:1 1 110px}.danger-action{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}@media(max-width:420px){.business-stat strong,.sales-overview .business-stat strong{font-size:18px}}";
   document.head.appendChild(style);
   const mrp=$("stockMrpValue");if(mrp)mrp.closest(".business-stat").remove();
   const history=$("salesHistoryList") || document.createElement("div");
-  history.id="salesHistoryList";
-  history.classList.remove("hidden");
+  history.id="salesHistoryList";history.classList.remove("hidden");
   const section=document.createElement("section");
   section.id="salesHistorySection";section.className="hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div>';
   section.appendChild(history);$("postTransactionBtn").insertAdjacentElement("afterend",section);
+  const heading=$("cartSection").querySelector(".cart-heading");
+  $("cartSection").querySelector(".cart-heading h2").textContent="SALE CART";
+  const count=$("cartCount"),right=document.createElement("div"),toggle=document.createElement("div");
+  right.className="sale-heading-right";toggle.className="sale-type-toggle";toggle.id="saleTypeToggle";
+  toggle.setAttribute("role","radiogroup");toggle.setAttribute("aria-label","Sale type");
+  toggle.innerHTML='<button type="button" id="actualSaleBtn" role="radio" aria-checked="true" class="active">Actual</button><button type="button" id="recordSaleBtn" role="radio" aria-checked="false">Record</button>';
+  heading.replaceChildren(heading.querySelector("h2"),right);right.append(count,toggle);
   const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
-  controls.innerHTML='<div class="sale-type-switch" role="group" aria-label="Sale type"><button type="button" id="actualSaleBtn" class="active">Actual Sale<small>Deducts stock</small></button><button type="button" id="recordSaleBtn">Record Sale<small>Does not deduct stock</small></button></div><div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">Add Selected</button></div>';
+  controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">ADD</button></div>';
   $("cartName").insertAdjacentElement("afterend",controls);
+  const oldCartActions=$("cartSection").querySelector(".cart-actions");if(oldCartActions)oldCartActions.remove();
+  const savedSection=$("savedSection");if(savedSection)savedSection.remove();
+  ["saveCartBtn","viewSavedBtn","exportCartBtn","clearCartBtn"].forEach(id=>{const el=$(id);if(el)el.remove();});
+  const oldPanel=$("salesPanel");if(oldPanel)oldPanel.remove();
   const oldPanel=$("salesPanel");if(oldPanel)oldPanel.remove();
   $("saleDateInput").value=formatLocalDateTimeInput(new Date());
 }
