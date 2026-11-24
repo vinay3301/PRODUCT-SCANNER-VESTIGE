@@ -375,6 +375,36 @@ test("Sale cart uses compact sale-type toggle, checkout wording, and manual stoc
   assert.doesNotMatch(html, /Switching modes will clear it/);
 });
 
+test("Stock List and Sale History limit the viewport to five entries", () => {
+  assert.match(html, /limitListToFive\(el\)/);
+  assert.match(html, /limitListToFive\(el\);/);
+  assert.match(html, /function limitListToFive\(el\)/);
+  const x = createHarness();
+  const children = Array.from({ length: 7 }, (_, i) => ({
+    getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
+  }));
+  const list = { children, style: {}, scrollTop: 116 };
+  x.context.limitListToFive(list);
+  assert.equal(list.style.maxHeight, "282px");
+  assert.equal(list.style.overflowY, "auto");
+  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.scrollbarGutter, "stable");
+  assert.equal(list.scrollTop, 116);
+});
+
+test("Lists with five or fewer entries do not get an unnecessary scrollbar", () => {
+  const x = createHarness();
+  const list = {
+    children: Array.from({ length: 5 }, (_, i) => ({
+      getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
+    })),
+    style: { maxHeight: "999px" }, scrollTop: 0
+  };
+  x.context.limitListToFive(list);
+  assert.equal(list.style.maxHeight, "");
+  assert.equal(list.style.overflowY, "visible");
+});
+
 test("Legacy sales migrate as Actual Sale and obsolete payment/refund fields are removed", () => {
   const x = createHarness();
   const oldDate = "2026-11-01T12:00:00.000Z";
