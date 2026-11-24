@@ -1,0 +1,33 @@
+name: Dealer Business Logic Tests
+
+on:
+  push:
+    branches:
+      - feature/dealer-inventory-sales
+    paths:
+      - "index.html"
+      - "tests/**"
+      - ".github/workflows/dealer-business-tests.yml"
+  pull_request:
+    paths:
+      - "index.html"
+      - "tests/**"
+      - ".github/workflows/dealer-business-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  business-logic:
+    name: Run dealer business logic regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run regression tests
+        run: node tests/business-logic.test.cjs
