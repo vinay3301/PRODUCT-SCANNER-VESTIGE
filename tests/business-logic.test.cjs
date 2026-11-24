@@ -8,7 +8,7 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const start = html.indexOf("function emptyBusinessData()");
+const start = html.indexOf("function normalizeCartItem(item)");
 const end = html.indexOf("// PRODUCT MATCHING", start);
 assert.ok(start >= 0 && end > start, "Could not locate business-logic section in index.html");
 const businessSource = html.slice(start, end);
@@ -43,6 +43,7 @@ function createHarness() {
       getItem: k => storage.has(k) ? storage.get(k) : null,
       removeItem: k => storage.delete(k)
     },
+    normalizeText: v => String(v || "").toLowerCase(),
     numericValue: v => Number(v) || 0,
     formatCartMoney: v => "₹" + Number(v).toFixed(2),
     formatMoney: v => String(v),
@@ -71,6 +72,18 @@ const assure = product("ASSURE ENCHANT BODY TALK", 103, 73, 1.99);
 const conditioner = product("ASSURE HAIR CONDITIONER", 330, 280, 2.9);
 const k1 = "assure enchant body talk";
 const k2 = "assure hair conditioner";
+
+test("Legacy cart free quantities migrate once into total quantity", () => {
+  const x = createHarness();
+  const migrated = x.context.normalizeCartItem({
+    key:k1,product:assure,quantity:2,freeQuantity:1
+  });
+  assert.equal(migrated.quantity,3);
+  assert.equal(migrated.freeQuantity,1);
+  assert.equal(migrated.quantityIncludesFree,true);
+  const normalizedAgain = x.context.normalizeCartItem(migrated);
+  assert.equal(normalizedAgain.quantity,3);
+});
 
 test("All inline JavaScript blocks in the page have valid syntax", () => {
   const blocks = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).filter(code => code.trim());
