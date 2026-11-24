@@ -89,6 +89,12 @@ test("All inline JavaScript blocks in the page have valid syntax", () => {
   blocks.forEach((code, index) => new vm.Script(code, { filename: "index.html inline script " + (index + 1) }));
 });
 
+test("Sales startup markup includes the history container required by initialization", () => {
+  assert.match(html, /id="salesHistoryList"/);
+  assert.match(html, /const history=\$\("salesHistoryList"\) \|\| document\.createElement\("div"\)/);
+  assert.match(html, /document\.head\.appendChild\(style\)/);
+});
+
 test("Legacy cart free quantities migrate once into total quantity", () => {
   const x = createHarness();
   const migrated = x.context.normalizeCartItem({ key: k1, product: assure, quantity: 2, freeQuantity: 1 });
