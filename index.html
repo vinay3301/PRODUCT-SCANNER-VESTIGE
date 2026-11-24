@@ -2395,7 +2395,7 @@ $("addToCartBtn").addEventListener("click",addSelectedProductToCart);
 $("postTransactionBtn").addEventListener("click",postCurrentTransaction);
 $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
 $("sellingModeBtn").addEventListener("click",()=>setBusinessMode("selling"));
-$("toggleStockListBtn").addEventListener("click",()=>{$("stockList").classList.toggle("hidden");renderInventory();});
+$("toggleStockListBtn").addEventListener("click",()=>{const list=$("stockList"),opening=list.classList.contains("hidden");list.classList.toggle("hidden");if(opening)list.scrollTop=0;renderInventory();});
 $("toggleStockHistoryBtn").addEventListener("click",()=>{$("stockHistoryList").classList.toggle("hidden");renderStockHistory();});
 
 $("exportBackupBtn").addEventListener("click",exportBusinessBackup);
