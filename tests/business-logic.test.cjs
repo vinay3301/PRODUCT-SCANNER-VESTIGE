@@ -241,7 +241,7 @@ test("Daily and monthly totals include both sale types and use recorded sale dat
   assert.equal(x.$("salesMonthValue").textContent, "₹175.00");
   c.businessData.sales = c.businessData.sales.filter(s => s.id !== "b");
   c.renderSalesOverview();
-  assert.equal($("salesTodayValue").textContent, "₹100.00");
+  assert.equal(x.$("salesTodayValue").textContent, "₹100.00");
 });
 
 test("Sale history shows type, total quantity, amount and PV without payment fields", () => {
