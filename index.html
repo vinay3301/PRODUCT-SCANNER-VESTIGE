@@ -2509,6 +2509,8 @@ function updateCheckoutButton(){
   const shortages=cartMode==="selling"&&saleType==="actual"?getSaleStockShortages():[];
   button.disabled=!cart.length||transactionBusy||shortages.length>0;
   button.title=shortages.length?"Insufficient stock: "+shortages.map(x=>x.name+" short by "+x.shortage).join(", "):"";
+  const notice=$("stockShortageNotice");
+  if(notice){notice.textContent=shortages.length?"Insufficient stock — "+shortages.map(x=>x.name+": "+x.required+" in cart, "+x.available+" available (short by "+x.shortage+")").join("; "):"";notice.classList.toggle("hidden",!shortages.length);}
 }
 function productSnapshot(item){return {key:item.key,product:{name:String(item.product.name||""),MRP:numericValue(item.product.MRP),DP:numericValue(item.product.DP),pv:numericValue(item.product.pv)}};}
 function getInventoryTotals(){return Object.values(businessData.inventory).reduce((t,i)=>{const q=Math.max(0,Number(i.quantity)||0);t.mrp+=numericValue(i.product?.MRP)*q;t.dp+=numericValue(i.product?.DP)*q;t.pv+=numericValue(i.product?.pv)*q;return t;},{mrp:0,dp:0,pv:0});}
@@ -2543,6 +2545,8 @@ function setupSalesUI(){
   toggle.setAttribute("role","radiogroup");toggle.setAttribute("aria-label","Sale type");
   toggle.innerHTML='<button type="button" id="actualSaleBtn" role="radio" aria-checked="true" class="active">Actual</button><button type="button" id="recordSaleBtn" role="radio" aria-checked="false">Record</button>';
   heading.replaceChildren(heading.querySelector("h2"),right);right.append(count,toggle);
+  const shortageNotice=document.createElement("div");shortageNotice.id="stockShortageNotice";shortageNotice.className="business-muted hidden";shortageNotice.style.cssText="margin-top:9px;padding:10px;border-radius:9px;background:var(--danger-bg);color:var(--danger-text);font-weight:650";
+  $("postTransactionBtn").insertAdjacentElement("afterend",shortageNotice);
   const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
   controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">ADD</button></div>';
   $("cartName").insertAdjacentElement("afterend",controls);
