@@ -8,10 +8,14 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const start = html.indexOf("function normalizeCartItem(item)");
+const start = html.indexOf("function emptyBusinessData()");
 const end = html.indexOf("// PRODUCT MATCHING", start);
 assert.ok(start >= 0 && end > start, "Could not locate business-logic section in index.html");
 const businessSource = html.slice(start, end);
+const normalizeStart = html.indexOf("function normalizeCartItem(item)");
+const normalizeEnd = html.indexOf("\nfunction loadCartFromStorage()", normalizeStart);
+assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart, "Could not locate cart normalization function");
+const normalizeSource = html.slice(normalizeStart, normalizeEnd);
 
 function createHarness() {
   const elements = new Map();
@@ -56,6 +60,7 @@ function createHarness() {
     console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
+  vm.runInNewContext(normalizeSource, context, { filename: "index.html#cart-normalization" });
   return { context, alerts, prompts, storage, $, setFailStorageWrites: value => { failStorageWrites = value; } };
 }
 
