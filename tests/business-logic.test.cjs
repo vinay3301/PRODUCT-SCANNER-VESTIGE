@@ -78,7 +78,7 @@ function addSale(x, type = "actual", quantity = 2, freeQuantity = 1, date = new 
   c.currentMode = "selling";
   c.saleType = type;
   c.cart = [{ key: k1, product: assure, quantity, freeQuantity, quantityIncludesFree: true }];
-  $("saleDateInput").value = date.slice(0, 16);
+  x.$("saleDateInput").value = date.slice(0, 16);
   c.postSale();
   return c.businessData.sales[0];
 }
@@ -189,7 +189,7 @@ test("Changing Actual Sale to Record Sale returns the previously deducted units"
   c.editingSaleId = sale.id;
   c.saleType = "record";
   c.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
-  $("saleDateInput").value = "2026-11-20T14:35";
+  x.$("saleDateInput").value = "2026-11-20T14:35";
   c.postSale();
   assert.equal(c.getStockQuantity(k1), 10);
   assert.equal(c.businessData.sales[0].saleType, "record");
@@ -237,8 +237,8 @@ test("Daily and monthly totals include both sale types and use recorded sale dat
     { id: "c", createdAt: thisMonth, saleDate: thisMonth, saleType: "record", total: 25, items: [] }
   ];
   c.renderSalesOverview();
-  assert.equal($("salesTodayValue").textContent, "₹150.00");
-  assert.equal($("salesMonthValue").textContent, "₹175.00");
+  assert.equal(x.$("salesTodayValue").textContent, "₹150.00");
+  assert.equal(x.$("salesMonthValue").textContent, "₹175.00");
   c.businessData.sales = c.businessData.sales.filter(s => s.id !== "b");
   c.renderSalesOverview();
   assert.equal($("salesTodayValue").textContent, "₹100.00");
