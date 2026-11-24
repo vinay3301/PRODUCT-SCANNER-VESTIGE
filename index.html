@@ -1304,6 +1304,13 @@ function addSelectedProductToCart() {
   }
 
   const existing = cart.find(item => item.key === key);
+  if (currentMode === "selling") {
+    const currentQty = (Number(existing?.quantity)||0) + (Number(existing?.freeQuantity)||0);
+    if (currentQty + 1 > getSaleStockLimit(key)) {
+      alert("No additional stock is available for " + product.name + ".");
+      return;
+    }
+  }
 
   if (existing) {
     existing.quantity += 1;
@@ -1354,6 +1361,10 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
+  if(currentMode==="selling"&&change>0&&Number(item.quantity)+Number(item.freeQuantity||0)+change>getSaleStockLimit(key)){
+    alert("You cannot add more than the available stock for "+item.product.name+".");
+    return;
+  }
   item.quantity = Math.max(0,Number(item.quantity)+change);
   if (item.quantity===0 && !(Number(item.freeQuantity)>0)) cart=cart.filter(entry=>entry!==item);
   saveCartToStorage();
@@ -2425,6 +2436,7 @@ $("cartList").addEventListener("change",event=>{
   const item=cart.find(entry=>entry.key===input.dataset.freeKey); if(!item)return;
   const n=Number(input.value);
   if(!Number.isInteger(n)||n<0){alert("Free quantity must be a whole number of zero or more.");input.value=item.freeQuantity||0;return;}
+  if(currentMode==="selling"&&Number(item.quantity)+n>getSaleStockLimit(item.key)){alert("Paid plus free quantity cannot exceed available stock.");input.value=item.freeQuantity||0;return;}
   item.freeQuantity=n;
   if(item.quantity===0&&n===0)cart=cart.filter(entry=>entry!==item);
   saveCartToStorage();renderCart();
@@ -2455,6 +2467,15 @@ function loadBusinessData(){
   }catch(e){console.error(e);businessData=emptyBusinessData();setStatus("Business data could not be read. Import a valid backup to restore it.");}
 }
 function getStockQuantity(key){return Math.max(0,Number(businessData.inventory[key]?.quantity)||0);}
+function getSaleStockLimit(key){
+  let limit=getStockQuantity(key);
+  if(editingSaleId){
+    const oldSale=businessData.sales.find(s=>s.id===editingSaleId);
+    const oldLine=oldSale?.items?.find(i=>i.key===key);
+    limit+=(Number(oldLine?.quantity)||0)+(Number(oldLine?.freeQuantity)||0);
+  }
+  return limit;
+}
 function productSnapshot(item){return {key:item.key,product:{name:String(item.product.name||""),MRP:numericValue(item.product.MRP),DP:numericValue(item.product.DP),pv:numericValue(item.product.pv)}};}
 function getInventoryTotals(){return Object.values(businessData.inventory).reduce((t,i)=>{const q=Math.max(0,Number(i.quantity)||0);t.mrp+=numericValue(i.product?.MRP)*q;t.dp+=numericValue(i.product?.DP)*q;t.pv+=numericValue(i.product?.pv)*q;return t;},{mrp:0,dp:0,pv:0});}
 function renderInventory(){
