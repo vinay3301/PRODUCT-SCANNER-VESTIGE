@@ -2679,7 +2679,7 @@ function beginSaleEdit(id){
 }
 function handleSalesHistoryClick(event){const b=event.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="edit")beginSaleEdit(id);if(b.dataset.saleAction==="delete")deleteSale(id);}
 function exportBusinessBackup(){
-  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart},savedCarts};
+  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart,cartMode},savedCarts};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="product-scanner-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);setStatus("Backup exported to this device.");
 }
 async function importBusinessBackup(event){
