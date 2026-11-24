@@ -9,6 +9,10 @@ const start = html.indexOf("function emptyBusinessData()");
 const end = html.indexOf("// PRODUCT MATCHING", start);
 assert.ok(start >= 0 && end > start, "Could not locate business-logic section in index.html");
 const businessSource = html.slice(start, end);
+const totalsStart = html.indexOf("function calculateCartTotals(items)");
+const totalsEnd = html.indexOf("\n// RENDER SAVED CARTS", totalsStart);
+assert.ok(totalsStart >= 0 && totalsEnd > totalsStart, "Could not locate cart totals function");
+const totalsSource = html.slice(totalsStart, totalsEnd);
 const normalizeStart = html.indexOf("function normalizeCartItem(item)");
 const normalizeEnd = html.indexOf("\nfunction loadCartFromStorage()", normalizeStart);
 assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart, "Could not locate cart normalization function");
@@ -22,8 +26,9 @@ function createHarness() {
   function $(id) {
     if (!elements.has(id)) {
       elements.set(id, {
-        value: "", textContent: "", innerHTML: "", disabled: false, files: [],
+        value: "", textContent: "", innerHTML: "", disabled: false, files: [], style: {}, children: [], scrollTop: 0,
         classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} },
+        setAttribute: () => {},
         addEventListener: () => {}, previousElementSibling: { textContent: "" },
         querySelector: () => ({ textContent: "" }), scrollIntoView: () => {}
       });
@@ -33,7 +38,7 @@ function createHarness() {
   const context = {
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
     cart: [], cartName: "", savedCarts: [], currentMode: "stocking",
-    editingSaleId: null, transactionBusy: false, saleType: "actual",
+    editingSaleId: null, transactionBusy: false, saleType: "actual", cartMode: "stocking",
     BUSINESS_STORAGE_KEY: "test-business", CART_STORAGE_KEY: "test-cart", SAVED_CARTS_STORAGE_KEY: "test-saved",
     $, localStorage: {
       setItem: (k, v) => { if (failStorageWrites) throw new Error("QuotaExceededError"); storage.set(k, v); },
@@ -49,6 +54,7 @@ function createHarness() {
     alert: message => alerts.push(String(message)), confirm: () => true, console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
+  vm.runInNewContext(totalsSource, context, { filename: "index.html#cart-totals" });
   vm.runInNewContext(normalizeSource, context, { filename: "index.html#cart-normalization" });
   // Keep UI rendering inert in this isolated business-logic harness.
   context.renderCart = () => {};
@@ -174,6 +180,87 @@ test("Overselling is rejected for Actual Sale without changing stock or history"
   assert.match(x.alerts.at(-1), /Insufficient stock/);
 });
 
+test("Manual stock adjustment persists quantity changes without changing the prepared sale cart", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.adjustStockQuantity(k1, -1);
+  assert.equal(x.context.getStockQuantity(k1), 4);
+  assert.equal(x.context.cart[0].quantity, 3);
+  assert.equal(x.context.cart[0].freeQuantity, 1);
+  assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
+});
+
+test("Actual Sale checkout is blocked after manual stock reduction creates a shortage", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 3);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.adjustStockQuantity(k1, -1);
+  assert.equal(x.context.cart[0].quantity, 3);
+  const shortage = x.context.getSaleStockShortages()[0];
+  assert.equal(shortage.name, assure.name);
+  assert.equal(shortage.required, 3);
+  assert.equal(shortage.available, 2);
+  assert.equal(shortage.shortage, 1);
+  x.context.postSale();
+  assert.equal(x.context.businessData.sales.length, 0);
+  assert.equal(x.context.getStockQuantity(k1), 2);
+  assert.match(x.alerts.at(-1), /Insufficient stock/);
+});
+
+test("Clear Stock resets quantities but retains product catalogue and sale history", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 7);
+  x.context.businessData.sales = [{ id: "existing", createdAt: new Date().toISOString(), saleDate: new Date().toISOString(), saleType: "record", total: 20, items: [] }];
+  x.context.clearAllStock();
+  assert.equal(x.context.getStockQuantity(k1), 0);
+  assert.equal(x.context.businessData.inventory[k1].product.name, assure.name);
+  assert.equal(x.context.businessData.sales.length, 1);
+});
+
+test("Switching between Stock and Selling preserves the active cart without a clear-cart prompt", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "selling";
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.setBusinessMode("stocking");
+  assert.equal(x.context.cart.length, 1);
+  assert.equal(x.context.cartMode, "selling");
+  x.context.setBusinessMode("selling");
+  assert.equal(x.context.cart.length, 1);
+  assert.equal(x.context.cart[0].quantity, 2);
+  assert.equal(x.alerts.length, 0);
+});
+
+test("Sale totals keep free quantities excluded while the dealer is viewing the Stock tab", () => {
+  const x = createHarness();
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  const totals = x.context.calculateCartTotals([{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }]);
+  assert.equal(totals.totalQuantity, 3);
+  assert.equal(totals.totalDP, 146);
+  assert.ok(Math.abs(totals.totalPV - 3.98) < 0.001);
+});
+
+test("Increasing a sale cart quantity while viewing Stock still enforces actual stock limits", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 2);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.changeCartQuantity(k1, 1);
+  assert.equal(x.context.cart[0].quantity, 2);
+  assert.match(x.alerts.at(-1), /available stock/);
+});
+
 test("Editing Actual Sale applies only the inventory difference", () => {
   const x = createHarness();
   const sale = addSale(x, "actual", 3, 1);
@@ -274,6 +361,50 @@ test("Seven-day edit restriction is retained", () => {
   assert.match(x.alerts.at(-1), /7 days/);
 });
 
+
+test("Sale cart uses compact sale-type toggle, checkout wording, and manual stock controls", () => {
+  assert.match(html, /SALE CART/);
+  assert.match(html, /sale-type-toggle/);
+  assert.match(html, /CHECK OUT ACTUAL SALE/);
+  assert.match(html, /CHECK OUT RECORD SALE/);
+  assert.match(html, /data-stock-delta="-1"/);
+  assert.match(html, /data-stock-delta="1"/);
+  assert.match(html, /id="clearStockBtn"/);
+  assert.doesNotMatch(html, /id="saveCartBtn"/);
+  assert.doesNotMatch(html, /id="viewSavedBtn"/);
+  assert.doesNotMatch(html, /Switching modes will clear it/);
+});
+
+test("Stock List and Sale History limit the viewport to five entries", () => {
+  assert.match(html, /limitListToFive\(el\)/);
+  assert.match(html, /limitListToFive\(el\);/);
+  assert.match(html, /function limitListToFive\(el\)/);
+  const x = createHarness();
+  const children = Array.from({ length: 7 }, (_, i) => ({
+    getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
+  }));
+  const list = { children, style: {}, scrollTop: 116 };
+  x.context.limitListToFive(list);
+  assert.equal(list.style.maxHeight, "282px");
+  assert.equal(list.style.overflowY, "auto");
+  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.scrollbarGutter, "stable");
+  assert.equal(list.scrollTop, 116);
+});
+
+test("Lists with five or fewer entries do not get an unnecessary scrollbar", () => {
+  const x = createHarness();
+  const list = {
+    children: Array.from({ length: 5 }, (_, i) => ({
+      getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
+    })),
+    style: { maxHeight: "999px" }, scrollTop: 0
+  };
+  x.context.limitListToFive(list);
+  assert.equal(list.style.maxHeight, "");
+  assert.equal(list.style.overflowY, "visible");
+});
+
 test("Legacy sales migrate as Actual Sale and obsolete payment/refund fields are removed", () => {
   const x = createHarness();
   const oldDate = "2026-11-01T12:00:00.000Z";
@@ -332,6 +463,7 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
   }
   const failed = results.filter(r => r.status === "FAIL");
   console.log("\n" + (results.length - failed.length) + "/" + results.length + " synchronous tests passed");
+  const asyncStart = results.length;
   const asyncTests = [
     ["Backup import restores inventory, sales and cart storage", async () => {
       const x = createHarness();
@@ -384,7 +516,7 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
     try { await fn(); results.push({ name, status: "PASS" }); }
     catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
   }
-  const asyncResults = results.slice(21);
+  const asyncResults = results.slice(asyncStart);
   for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
   const allFailed = results.filter(r => r.status === "FAIL");
   console.log("\n" + (results.length - allFailed.length) + "/" + results.length + " total tests passed");
