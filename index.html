@@ -692,6 +692,13 @@ button:disabled {
 .theme-toggle{width:42px;height:42px;min-width:42px;padding:0;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--secondary-bg);color:var(--text);border:1px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .theme-toggle svg{width:20px;height:20px;display:block}
 .theme-toggle:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+
+@media(max-width:380px){
+  header{padding:14px 12px 10px;gap:8px}
+  .theme-toggle{width:36px;height:36px;min-width:36px}
+  .pill{padding:4px 7px;font-size:10px}
+  .sub{font-size:11px}
+}
 </style>
 </head>
 
@@ -703,7 +710,7 @@ button:disabled {
     <div class="sub">Enhanced Multi-Pass OCR Match Engine</div>
   </div>
   <button class="theme-toggle" id="themeToggleBtn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
   </button>
   <span class="pill" id="apiBadge">Connecting…</span>
 </header>
@@ -3610,8 +3617,8 @@ function applyTheme(theme){
   const button=$("themeToggleBtn");
   if(button){
     button.innerHTML=selected==="light"
-      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>'
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>';
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>';
     button.setAttribute("aria-label",selected==="light"?"Switch to dark theme":"Switch to light theme");
     button.title=selected==="light"?"Switch to dark theme":"Switch to light theme";
   }
