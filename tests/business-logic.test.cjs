@@ -234,6 +234,28 @@ test("Switching between Stock and Selling preserves the active cart without a cl
   assert.equal(x.alerts.length, 0);
 });
 
+test("Sale totals keep free quantities excluded while the dealer is viewing the Stock tab", () => {
+  const x = createHarness();
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  const totals = x.context.calculateCartTotals([{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }]);
+  assert.equal(totals.totalQuantity, 3);
+  assert.equal(totals.totalDP, 146);
+  assert.ok(Math.abs(totals.totalPV - 3.98) < 0.001);
+});
+
+test("Increasing a sale cart quantity while viewing Stock still enforces actual stock limits", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 2);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.changeCartQuantity(k1, 1);
+  assert.equal(x.context.cart[0].quantity, 2);
+  assert.match(x.alerts.at(-1), /available stock/);
+});
+
 test("Editing Actual Sale applies only the inventory difference", () => {
   const x = createHarness();
   const sale = addSale(x, "actual", 3, 1);
