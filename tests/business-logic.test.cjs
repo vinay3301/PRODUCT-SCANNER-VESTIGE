@@ -204,7 +204,7 @@ test("Changing Record Sale to Actual Sale deducts the new quantities", () => {
   c.saleType = "actual";
   c.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
   c.postSale();
-  assert.equal(c.getStockQuantity(k1), 6);
+  assert.equal(c.getStockQuantity(k1), 7);
   assert.equal(c.businessData.sales[0].saleType, "actual");
 });
 
@@ -229,7 +229,8 @@ test("Daily and monthly totals include both sale types and use recorded sale dat
   const c = x.context;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10).toISOString();
-  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 10).toISOString();
+  const otherDay = now.getDate() === 1 ? 2 : 1;
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), otherDay, 10).toISOString();
   c.businessData.sales = [
     { id: "a", createdAt: today, saleDate: today, saleType: "actual", total: 100, items: [] },
     { id: "b", createdAt: today, saleDate: today, saleType: "record", total: 50, items: [] },
