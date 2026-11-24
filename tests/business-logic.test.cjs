@@ -494,6 +494,22 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
 });
 
 
+
+test("Sale history layout has side-by-side checkout and clear-cart actions", () => {
+  assert.match(html, /sale-checkout-actions/);
+  assert.match(html, /CLEAR SALE CART/);
+  assert.match(html, /CHECK OUT SALE/);
+  assert.match(html, /clearButton\.addEventListener\("click"/);
+});
+test("Sale history shows three entries and sorts newest first", () => {
+  assert.match(businessSource, /records=\[\.\.\.\(businessData\.sales\|\|\[\]\)\]\.sort\(\(a,b\)=>new Date\(b\.saleDate\|\|b\.createdAt\)/);
+  assert.match(businessSource, /limitListTo\(el,3\)/);
+});
+test("Stock-in history sorts newest first and products alphabetically", () => {
+  assert.match(businessSource, /stockIns\|\|\[\]\)\]\.sort\(\(a,b\)=>new Date\(b\.createdAt\)/);
+  assert.match(businessSource, /\(r\.items\|\|\[\]\)\]\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
+});
+
 (async () => {
   for (const result of results) {
     console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
