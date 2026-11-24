@@ -33,7 +33,7 @@ function createHarness() {
   const context = {
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
     cart: [], cartName: "", savedCarts: [], currentMode: "stocking",
-    editingSaleId: null, transactionBusy: false, saleType: "actual",
+    editingSaleId: null, transactionBusy: false, saleType: "actual", cartMode: "stocking",
     BUSINESS_STORAGE_KEY: "test-business", CART_STORAGE_KEY: "test-cart", SAVED_CARTS_STORAGE_KEY: "test-saved",
     $, localStorage: {
       setItem: (k, v) => { if (failStorageWrites) throw new Error("QuotaExceededError"); storage.set(k, v); },
@@ -174,6 +174,65 @@ test("Overselling is rejected for Actual Sale without changing stock or history"
   assert.match(x.alerts.at(-1), /Insufficient stock/);
 });
 
+test("Manual stock adjustment persists quantity changes without changing the prepared sale cart", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.adjustStockQuantity(k1, -1);
+  assert.equal(x.context.getStockQuantity(k1), 4);
+  assert.equal(x.context.cart[0].quantity, 3);
+  assert.equal(x.context.cart[0].freeQuantity, 1);
+  assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
+});
+
+test("Actual Sale checkout is blocked after manual stock reduction creates a shortage", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 3);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "stocking";
+  x.context.saleType = "actual";
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.adjustStockQuantity(k1, -1);
+  assert.equal(x.context.cart[0].quantity, 3);
+  const shortage = x.context.getSaleStockShortages()[0];
+  assert.equal(shortage.name, assure.name);
+  assert.equal(shortage.required, 3);
+  assert.equal(shortage.available, 2);
+  assert.equal(shortage.shortage, 1);
+  x.context.postSale();
+  assert.equal(x.context.businessData.sales.length, 0);
+  assert.equal(x.context.getStockQuantity(k1), 2);
+  assert.match(x.alerts.at(-1), /Insufficient stock/);
+});
+
+test("Clear Stock resets quantities but retains product catalogue and sale history", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 7);
+  x.context.businessData.sales = [{ id: "existing", createdAt: new Date().toISOString(), saleDate: new Date().toISOString(), saleType: "record", total: 20, items: [] }];
+  x.context.clearAllStock();
+  assert.equal(x.context.getStockQuantity(k1), 0);
+  assert.equal(x.context.businessData.inventory[k1].product.name, assure.name);
+  assert.equal(x.context.businessData.sales.length, 1);
+});
+
+test("Switching between Stock and Selling preserves the active cart without a clear-cart prompt", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  x.context.cartMode = "selling";
+  x.context.currentMode = "selling";
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.setBusinessMode("stocking");
+  assert.equal(x.context.cart.length, 1);
+  assert.equal(x.context.cartMode, "selling");
+  x.context.setBusinessMode("selling");
+  assert.equal(x.context.cart.length, 1);
+  assert.equal(x.context.cart[0].quantity, 2);
+  assert.equal(x.alerts.length, 0);
+});
+
 test("Editing Actual Sale applies only the inventory difference", () => {
   const x = createHarness();
   const sale = addSale(x, "actual", 3, 1);
@@ -272,6 +331,20 @@ test("Seven-day edit restriction is retained", () => {
   x.context.postSale();
   assert.equal(x.context.getStockQuantity(k1), before);
   assert.match(x.alerts.at(-1), /7 days/);
+});
+
+
+test("Sale cart uses compact sale-type toggle, checkout wording, and manual stock controls", () => {
+  assert.match(html, /SALE CART/);
+  assert.match(html, /sale-type-toggle/);
+  assert.match(html, /CHECK OUT ACTUAL SALE/);
+  assert.match(html, /CHECK OUT RECORD SALE/);
+  assert.match(html, /data-stock-delta="-1"/);
+  assert.match(html, /data-stock-delta="1"/);
+  assert.match(html, /id="clearStockBtn"/);
+  assert.doesNotMatch(html, /id="saveCartBtn"/);
+  assert.doesNotMatch(html, /id="viewSavedBtn"/);
+  assert.doesNotMatch(html, /Switching modes will clear it/);
 });
 
 test("Legacy sales migrate as Actual Sale and obsolete payment/refund fields are removed", () => {
