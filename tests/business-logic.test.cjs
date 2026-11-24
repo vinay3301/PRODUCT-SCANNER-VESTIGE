@@ -383,10 +383,10 @@ test("Every static event-listener target is present in the HTML or generated UI 
   assert.doesNotMatch(html, /\$\(["']savedList["']\)\.addEventListener/);
 });
 
-test("Stock List and Sale History limit the viewport to five entries", () => {
+test("Stock List retains five-entry viewport while histories use five-entry scroll chaining", () => {
   assert.match(html, /limitListToFive\(el\)/);
-  assert.match(html, /limitListToFive\(el\);/);
-  assert.match(html, /function limitListToFive\(el\)/);
+  assert.match(html, /limitListTo\(el,5,"auto"\)/);
+  assert.match(html, /function limitListTo\(el,visibleCount,overscrollBehavior="contain"\)/);
   const x = createHarness();
   const children = Array.from({ length: 7 }, (_, i) => ({
     getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
@@ -398,6 +398,8 @@ test("Stock List and Sale History limit the viewport to five entries", () => {
   assert.equal(list.style.overscrollBehavior, "contain");
   assert.equal(list.style.scrollbarGutter, "stable");
   assert.equal(list.scrollTop, 116);
+  x.context.limitListTo(list, 5, "auto");
+  assert.equal(list.style.overscrollBehavior, "auto");
 });
 
 test("Sale cart viewport shows ten products and scrolls continuously beyond ten", () => {
@@ -413,9 +415,13 @@ test("Sale cart viewport shows ten products and scrolls continuously beyond ten"
   assert.equal(list.scrollTop, 156);
 });
 
-test("Stock-in History uses the five-entry scroll viewport", () => {
+test("Stock-in History shows five compact summaries with expandable alphabetized products", () => {
   assert.ok(businessSource.includes("function renderStockHistory()"));
-  assert.ok(businessSource.includes("limitListToFive(el)"));
+  assert.match(businessSource, /limitListTo\(el,5,"auto"\)/);
+  assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
+  assert.match(businessSource, /class="history-detail" id="'+detailsId+'" hidden/);
+  assert.match(html, /stockHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
+  assert.match(businessSource, /\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
 
 test("Stock products are sorted alphabetically without case sensitivity", () => {
@@ -501,9 +507,15 @@ test("Sale history layout has side-by-side checkout and clear-cart actions", () 
   assert.match(html, /CHECK OUT SALE/);
   assert.match(html, /clearButton\.addEventListener\("click"/);
 });
-test("Sale history shows three entries and sorts newest first", () => {
+test("Sale history shows five compact summaries, expands product details, and sorts newest first", () => {
   assert.match(businessSource, /records=\[\.\.\.\(businessData\.sales\|\|\[\]\)\]\.sort\(\(a,b\)=>new Date\(b\.saleDate\|\|b\.createdAt\)/);
-  assert.match(businessSource, /limitListTo\(el,3\)/);
+  assert.match(businessSource, /limitListTo\(el,5,"auto"\)/);
+  assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
+  assert.match(businessSource, /class="history-detail" id="'+detailsId+'" hidden/);
+  assert.match(businessSource, /function handleHistoryToggle\(event\)/);
+  assert.match(html, /salesHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
+  assert.match(businessSource, /data-sale-action="edit"/);
+  assert.match(businessSource, /data-sale-action="delete"/);
 });
 test("Stock-in history sorts newest first and products alphabetically", () => {
   assert.match(businessSource, /stockIns\|\|\[\]\)\]\.sort\(\(a,b\)=>new Date\(b\.createdAt\)/);
