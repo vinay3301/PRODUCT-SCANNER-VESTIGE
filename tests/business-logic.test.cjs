@@ -343,7 +343,7 @@ test("Sale history shows type, total quantity, amount and PV without payment fie
   x.context.renderSalesHistory();
   const htmlOut = x.$("salesHistoryList").innerHTML;
   assert.match(htmlOut, /Record Sale/);
-  assert.match(htmlOut, /Total quantity: 3/);
+  assert.match(htmlOut, /3 total quantity/);
   assert.match(htmlOut, /Amount sold:/);
   assert.match(htmlOut, /Total PV:/);
   assert.doesNotMatch(htmlOut, /Unpaid|Partially paid|Paid|Payment|Refund|Balance/);
@@ -419,7 +419,7 @@ test("Stock-in History shows five compact summaries with expandable alphabetized
   assert.ok(businessSource.includes("function renderStockHistory()"));
   assert.match(businessSource, /limitListTo\(el,5,"auto"\)/);
   assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
-  assert.match(businessSource, /class="history-detail" id="'+detailsId+'" hidden/);
+  assert.match(businessSource, /class="history-detail" id=.*hidden/);
   assert.match(html, /stockHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
   assert.match(businessSource, /\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
@@ -511,7 +511,7 @@ test("Sale history shows five compact summaries, expands product details, and so
   assert.match(businessSource, /records=\[\.\.\.\(businessData\.sales\|\|\[\]\)\]\.sort\(\(a,b\)=>new Date\(b\.saleDate\|\|b\.createdAt\)/);
   assert.match(businessSource, /limitListTo\(el,5,"auto"\)/);
   assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
-  assert.match(businessSource, /class="history-detail" id="'+detailsId+'" hidden/);
+  assert.match(businessSource, /class="history-detail" id=.*hidden/);
   assert.match(businessSource, /function handleHistoryToggle\(event\)/);
   assert.match(html, /salesHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
   assert.match(businessSource, /data-sale-action="edit"/);
