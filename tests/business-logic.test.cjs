@@ -18,6 +18,7 @@ function createHarness() {
   const alerts = [];
   const prompts = [];
   const storage = new Map();
+  let failStorageWrites = false;
   function $(id) {
     if (!elements.has(id)) {
       elements.set(id, {
@@ -38,7 +39,7 @@ function createHarness() {
     SAVED_CARTS_STORAGE_KEY: "test-saved",
     $,
     localStorage: {
-      setItem: (k, v) => storage.set(k, v),
+      setItem: (k, v) => { if (failStorageWrites) throw new Error("QuotaExceededError"); storage.set(k, v); },
       getItem: k => storage.has(k) ? storage.get(k) : null,
       removeItem: k => storage.delete(k)
     },
@@ -54,7 +55,7 @@ function createHarness() {
     console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
-  return { context, alerts, prompts, storage, $ };
+  return { context, alerts, prompts, storage, $, setFailStorageWrites: value => { failStorageWrites = value; } };
 }
 
 const results = [];
@@ -168,6 +169,52 @@ test("Backup business and cart schemas validate; negative stock is rejected", ()
   assert.equal(c.validSavedCartPayload([{ id: "saved-1", cart: [{ product: assure, quantity: 1 }] }]), true);
   const invalid = { ...c.businessData, inventory: { [k1]: { product: assure, quantity: -1 } } };
   assert.equal(c.validBusinessData(invalid), false);
+});
+
+
+test("Backup validation rejects malformed payment and refund ledger entries", () => {
+  const malformedPayment = JSON.parse(JSON.stringify(c.businessData));
+  malformedPayment.sales[0].payments[0].amount = "not-a-number";
+  assert.equal(c.validBusinessData(malformedPayment), false);
+  const malformedRefund = JSON.parse(JSON.stringify(c.businessData));
+  malformedRefund.sales[0].refunds[0].method = "Cheque";
+  assert.equal(c.validBusinessData(malformedRefund), false);
+});
+
+test("Backup validation rejects negative free and saved-cart quantities", () => {
+  assert.equal(c.validCartPayload({ cart: [{ product: assure, quantity: 1, freeQuantity: -1 }] }), false);
+  assert.equal(c.validSavedCartPayload([{ id: "saved-bad", cart: [{ product: assure, quantity: -2 }] }]), false);
+});
+
+test("Failed stock-in storage write preserves stock and the cart", () => {
+  const x = createHarness();
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 0 }];
+  x.setFailStorageWrites(true);
+  x.context.postStockIn();
+  assert.equal(x.context.getStockQuantity(k1), 0);
+  assert.equal(x.context.businessData.stockIns.length, 0);
+  assert.equal(x.context.cart.length, 1);
+});
+
+test("Failed sale storage write preserves inventory, sales and the cart", () => {
+  const x = createHarness();
+  x.context.currentMode = "selling";
+  x.context.businessData.inventory[k1] = { product: assure, quantity: 5 };
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.setFailStorageWrites(true);
+  x.context.postSale();
+  assert.equal(x.context.getStockQuantity(k1), 5);
+  assert.equal(x.context.businessData.sales.length, 0);
+  assert.equal(x.context.cart.length, 1);
+});
+
+test("Transaction busy guard prevents a second submission", () => {
+  const x = createHarness();
+  x.context.transactionBusy = true;
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.postCurrentTransaction();
+  assert.equal(x.context.businessData.stockIns.length, 0);
+  assert.equal(x.context.cart.length, 1);
 });
 
 const failed = results.filter(r => r.status === "FAIL");
