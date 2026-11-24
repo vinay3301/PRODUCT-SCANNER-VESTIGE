@@ -1696,6 +1696,8 @@ function legacyRenderCart() {
     list.appendChild(row);
   });
 
+  limitListToTen(list);
+
   const hasItems = cart.length > 0;
 
   $("cartEmpty").classList.toggle("hidden", hasItems);
@@ -2434,6 +2436,7 @@ function renderStockHistory(){
   const el=$("stockHistoryList");const records=businessData.stockIns||[];
   el.innerHTML=records.length?records.map(r=>{const d=new Date(r.createdAt);const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" × "+i.quantity+" (MRP "+formatMoney(i.product.MRP)+", DP "+formatMoney(i.product.DP)+", PV "+i.product.pv+")").join("<br>");
     return '<div class="history-card"><strong>'+escapeHtml(r.name||"Stock-in")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>DP value: '+formatCartMoney(r.totalDP)+' · MRP '+formatCartMoney(r.totalMRP)+' · PV '+Number(r.totalPV||0).toLocaleString("en-IN")+'</strong></div></div>';}).join(""):'<div class="business-muted">No stock-in history yet.</div>';
+  limitListToFive(el);
 }
 function postStockIn(){
   const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add at least one product with a positive quantity.");return;}
@@ -2516,7 +2519,7 @@ function changeCartQuantity(key,change){
 }
 function renderSaleProductOptions(){
   const select=$("saleProductSelect");if(!select)return;
-  const selected=select.value,rows=Object.entries(businessData.inventory||{}).filter(([,v])=>Number(v.quantity)>0).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
+  const selected=select.value,rows=Object.entries(businessData.inventory||{}).filter(([,v])=>Number(v.quantity)>0).sort(compareProductEntriesByName);
   select.innerHTML='<option value="">Select product from available stock</option>'+rows.map(([k,v])=>'<option value="'+escapeHtml(k)+'">'+escapeHtml(v.product.name)+' · Qty '+Number(v.quantity)+'</option>').join("");
   if(rows.some(([k])=>k===selected))select.value=selected;$("addStockProductBtn").disabled=!rows.length;
 }
@@ -2529,15 +2532,15 @@ function addStockProductToCart(){
   if(old)old.quantity+=1;else cart.push({key,product:{...inv.product},quantity:1,freeQuantity:0,quantityIncludesFree:true});
   saveCartToStorage();renderCart();$("saleProductSelect").value="";setStatus("Added "+inv.product.name+" to the sale cart.");
 }
-function limitListToFive(el){
+function limitListTo(el,visibleCount){
   if(!el)return;
   const oldScrollTop=el.scrollTop||0;
   el.style.overflowY="auto";
   el.style.overscrollBehavior="contain";
   el.style.scrollbarGutter="stable";
-  if(el.children.length>5){
-    const first=el.children[0],fifth=el.children[4];
-    const height=fifth.getBoundingClientRect().bottom-first.getBoundingClientRect().top;
+  if(el.children.length>visibleCount){
+    const first=el.children[0],lastVisible=el.children[visibleCount-1];
+    const height=lastVisible.getBoundingClientRect().bottom-first.getBoundingClientRect().top;
     el.style.maxHeight=Math.ceil(height)+"px";
   }else{
     el.style.maxHeight="";
@@ -2545,10 +2548,15 @@ function limitListToFive(el){
   }
   el.scrollTop=oldScrollTop;
 }
+function limitListToFive(el){limitListTo(el,5);}
+function limitListToTen(el){limitListTo(el,10);}
+function compareProductEntriesByName(a,b){
+  return String(a?.[1]?.product?.name||"").localeCompare(String(b?.[1]?.product?.name||""),"en",{sensitivity:"base"});
+}
 function renderInventory(){
   const t=getInventoryTotals();$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
   const el=$("stockList");if(el&&!el.classList.contains("hidden")){
-    const rows=Object.entries(businessData.inventory).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
+    const rows=Object.entries(businessData.inventory).sort(compareProductEntriesByName);
     el.innerHTML=rows.length?rows.map(([k,v])=>'<div class="business-row"><div><strong>'+escapeHtml(v.product.name)+'</strong><small>DP '+escapeHtml(formatMoney(v.product.DP))+' · PV '+escapeHtml(v.product.pv??0)+'</small></div><div class="stock-quantity-controls"><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="-1" aria-label="Decrease stock">−</button><strong>'+Number(v.quantity)+'</strong><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="1" aria-label="Increase stock">+</button></div></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
     limitListToFive(el);
   }renderSaleProductOptions();updateCheckoutButton();
