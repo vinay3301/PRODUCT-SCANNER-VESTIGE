@@ -652,7 +652,7 @@ Use **Stocking** when products are received into the dealer's shop.
 3. Tap **SAVE STOCK-IN** to post the receipt.
 4. The saved quantities are added to the available inventory.
 
-Each stock-in creates a separate dated history record. The stock summary displays the current inventory value using product MRP, DP and PV. Stock-in history retains the item quantities and price/point values captured at the time of receipt.
+Each stock-in creates a separate dated history record. The stock summary displays only total stock DP value and total stock PV value. Stock-in history retains the item quantities and price/point values captured at the time of receipt. Stock-in history retains the item quantities and price/point values captured at the time of receipt.
 
 ## 12.2 Current stock
 
@@ -660,63 +660,80 @@ The stock list displays products with a positive available quantity. The scanner
 
 # 13. SELLING MODE
 
-Use **Selling** to prepare and save customer sales.
+Use **Selling** to prepare and save customer sales. The customer/cart name is optional. The sale cart is the single place to prepare, save and edit a sale.
 
-- The customer name is optional.
-- The cart displays the available stock for each product.
-- The app prevents paid plus free quantities from exceeding available stock, and checks stock again before saving.
-- A sale is valued using the paid quantity multiplied by the product DP.
-- Free quantity is charged at zero but is included in the quantity deducted from stock.
-- Stock is deducted when the sale is saved, regardless of whether the customer has paid.
+The Selling area includes:
 
-## 13.1 Payments and outstanding balance
+- **Actual Sale** and **Record Sale** modes. Actual Sale is selected by default whenever Selling mode is opened.
+- A product selector populated from products with positive available stock, with the selector and **Add Selected** button on the same row.
+- Total sale today and total sale this month, calculated from all saved sales (both sale types) using each sale's recorded date and the device's local calendar.
+- Sale History with the sale type, date, product quantities, total quantity, amount sold and total PV.
 
-A dealer may record an amount received when saving the sale or add payments later from Sales history. Payment methods are **Cash** and **Online**. Each payment is retained as a dated ledger entry.
+## 13.1 Actual Sale
 
-The payment status is calculated from the sale total and net payments:
+An Actual Sale deducts stock when it is saved.
 
-- **Unpaid:** no net payment received.
-- **Partially paid:** some payment received, but an amount remains outstanding.
-- **Paid:** the sale total has been received.
-- **Refund due:** a sale was revised down after more money had been received than the revised sale total.
+- The paid quantity is charged at the product DP.
+- Free quantity is included in total quantity, but does not contribute to the sale amount or PV.
+- Both paid and free units are deducted from inventory.
+- Available stock is checked before the sale is saved.
 
-## 13.2 Returns and editing saved sales
+## 13.2 Record Sale
 
-A saved sale can be edited within seven days of its original date. Load it from Sales history using **Edit / return**, change quantities or products in the cart, and save the changes.
+A Record Sale saves the transaction for reporting and history without changing inventory.
 
-Only the inventory difference is applied:
-- Increasing a sale quantity deducts only the additional quantity.
-- Decreasing a quantity returns the difference to stock.
-- Removing a product returns its full previous quantity.
-- Adding a product deducts the newly added quantity.
+- Choose the sale date and time manually before saving.
+- The paid quantity contributes to amount sold and PV.
+- Free quantity is included in total quantity but contributes neither sale amount nor PV.
+- Neither paid nor free units are deducted from stock.
 
-Previous payment and refund entries are not deleted when a sale is edited. The app retains a revision record containing the previous sale lines and total.
+Both Actual Sale and Record Sale contribute to the daily and monthly sale totals. If a sale is deleted or edited, the totals are recalculated from the remaining saved records and their sale dates.
 
-## 13.3 Refunds
+## 13.3 Editing, returns and deleting sales
 
-If a revised sale total is lower than the net amount already received, Sales history shows the refund due. Use **Record refund** after actually returning money to the customer. Record the refund amount and whether it was paid by Cash or Online. Refunds are stored separately from the original payment entries.
+A saved sale can be edited within seven days of its original creation time. Choose **Edit / Return** in Sale History. The sale is loaded into the existing cart; make the changes and save.
+
+Inventory adjustments depend on the original and new sale types:
+
+- Editing an Actual Sale adjusts stock by the difference between the old and new quantities.
+- Editing a Record Sale does not change stock.
+- Changing Actual Sale to Record Sale returns the old sale's deducted quantities to stock.
+- Changing Record Sale to Actual Sale deducts the new sale quantities from stock, subject to availability.
+- Deleting an Actual Sale returns all paid and free units to stock.
+- Deleting a Record Sale does not change stock.
+
+The app retains a revision record when a sale is edited. Deleting a sale removes that sale from Sale History and recalculates the daily and monthly totals.
+
+## 13.4 Free products
+
+The cart supports free quantities for promotions such as buying two products and giving one additional unit free. Total quantity includes paid and free units. Free units are excluded from the sale DP amount and PV. In Actual Sale, all units reduce inventory; in Record Sale, none reduce inventory.
+
+## 13.5 Payment tracking
+
+Payment tracking is not part of the current application workflow. There are no payment methods, amount-received fields, outstanding balances, payment ledgers or refund ledgers.
 
 # 14. LOCAL DATA AND BACKUPS
 
 The app stores the following information in the current browser:
 
-- Active cart and existing saved carts.
+- Active cart and saved carts.
 - Current inventory quantities.
 - Stock-in history.
-- Sales history and sale revisions.
-- Payment and refund ledgers.
+- Sales history, sale types, sale dates and sale revisions.
 
 This storage is local to the browser profile. Data is not automatically copied to another browser, phone, or computer. Clearing browser/site data may permanently remove it.
 
-Use **Export backup** to download a JSON backup to the device. It includes inventory, stock-in history, sales, payments, refunds, active cart and saved carts. Use **Import backup** in the destination browser to restore it. Import validates the backup and asks for confirmation before replacing the data currently stored in that browser.
+Use **Export backup** to download a JSON backup to the device. It includes inventory, stock-in history, sales history, sale types and dates, active cart and saved carts. Use **Import backup** in the destination browser to restore it. Import validates the backup and asks for confirmation before replacing the data currently stored in that browser.
+
+Older version 1 backups remain supported. On loading or importing older sale records, the app treats them as **Actual Sale** records because the previous version always deducted stock when a sale was saved. Their original sale timestamps are used as their sale dates. Obsolete payment and refund fields are ignored and removed from the normalized business data; inventory, stock-in records, sale items and sale totals are preserved.
 
 **Important:** Keep backup files somewhere safe. Export a fresh backup regularly and before clearing browser data, changing devices, or changing browsers.
 
 # 15. IMPORTANT OPERATING NOTES
 
-1. Use Stocking mode for incoming products and Selling mode for customer sales.
-2. Save each stock-in or sale only once. A saved transaction updates inventory immediately.
-3. Free quantities reduce stock even though they do not increase the sale value.
-4. Sale edits are restricted to seven days after the original sale date.
-5. Payments and refunds are recorded as separate dated entries; editing a sale does not erase those entries.
+1. Use Stocking mode for incoming products and Selling mode for customer sales or records.
+2. Actual Sale deducts paid and free quantities from stock; Record Sale does not change stock.
+3. Free quantities count towards total quantity but not sale amount or PV.
+4. Record Sale uses the manually selected sale date and time. Daily/monthly totals include both sale types.
+5. Sale edits are restricted to seven days after the original sale creation time.
 6. The inventory is private to the local browser profile, not protected by a dealer login. Anyone using the same browser profile can access its stored data.

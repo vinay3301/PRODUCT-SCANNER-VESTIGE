@@ -787,7 +787,6 @@ button:disabled {
   <section class="business-panel" id="inventoryPanel">
     <h2>Current Stock</h2>
     <div class="business-grid">
-      <div class="business-stat"><small>Stock MRP Value</small><strong id="stockMrpValue">₹0.00</strong></div>
       <div class="business-stat"><small>Stock DP Value</small><strong id="stockDpValue">₹0.00</strong></div>
       <div class="business-stat"><small>Stock PV Value</small><strong id="stockPvValue">0</strong></div>
     </div>
@@ -799,16 +798,7 @@ button:disabled {
     <div class="business-list hidden" id="stockHistoryList"></div>
   </section>
 
-  <section class="business-panel hidden" id="salesPanel">
-    <h2>Sales</h2>
-    <div class="business-muted">Save a sale to deduct paid and free quantities from stock. Payments can be recorded now or later.</div>
-    <div class="business-fields">
-      <div class="business-field"><label for="receivedNow">Amount received now (optional)</label><input class="business-input" id="receivedNow" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="business-field"><label for="receivedMethod">Payment method</label><select class="business-input" id="receivedMethod"><option value="">Choose if received</option><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
-    </div>
-    <div class="business-actions"><button type="button" id="toggleSalesHistoryBtn">Sales history</button></div>
-    <div class="business-list hidden" id="salesHistoryList"></div>
-  </section>
+
 
 
   <!-- SHOPPING CART -->
@@ -1662,7 +1652,7 @@ function renderSavedCarts() {
 // RENDER ACTIVE CART
 // ==========================================
 
-function renderCart() {
+function legacyRenderCart() {
 
   const list = $("cartList");
 
@@ -2454,7 +2444,7 @@ $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
 $("sellingModeBtn").addEventListener("click",()=>setBusinessMode("selling"));
 $("toggleStockListBtn").addEventListener("click",()=>{$("stockList").classList.toggle("hidden");renderInventory();});
 $("toggleStockHistoryBtn").addEventListener("click",()=>{$("stockHistoryList").classList.toggle("hidden");renderStockHistory();});
-$("toggleSalesHistoryBtn").addEventListener("click",()=>{$("salesHistoryList").classList.toggle("hidden");renderSalesHistory();});
+
 $("exportBackupBtn").addEventListener("click",exportBusinessBackup);
 $("importBackupBtn").addEventListener("click",()=>$("backupFile").click());
 $("backupFile").addEventListener("change",importBusinessBackup);
@@ -2470,20 +2460,9 @@ $("cartList").addEventListener("change",event=>{
 });
 
 // ==========================================
-// DEALER STOCK, SALES, PAYMENT LEDGERS AND BACKUP
+// DEALER STOCK, SALES AND BACKUP
 // ==========================================
 function emptyBusinessData(){return {schemaVersion:1,inventory:{},stockIns:[],sales:[]};}
-function validBusinessData(d){
-  if(!d||d.schemaVersion!==1||!d.inventory||typeof d.inventory!=="object"||Array.isArray(d.inventory)||!Array.isArray(d.stockIns)||!Array.isArray(d.sales))return false;
-  const validProduct=p=>p&&typeof p.name==="string"&&Number.isFinite(Number(p.MRP))&&Number.isFinite(Number(p.DP))&&Number.isFinite(Number(p.pv));
-  const validLine=i=>i&&typeof i.key==="string"&&validProduct(i.product);
-  const validQty=q=>Number.isFinite(Number(q))&&Number(q)>=0;
-  const validLedgerEntry=e=>e&&typeof e.id==="string"&&typeof e.createdAt==="string"&&Number.isFinite(Number(e.amount))&&Number(e.amount)>0&&["Cash","Online"].includes(e.method);
-  if(!Object.values(d.inventory).every(i=>i&&validProduct(i.product)&&validQty(i.quantity)))return false;
-  if(!d.stockIns.every(r=>r&&typeof r.id==="string"&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>0)))return false;
-  if(!d.sales.every(r=>r&&typeof r.id==="string"&&typeof r.createdAt==="string"&&Number.isFinite(Number(r.total))&&Number(r.total)>=0&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&validQty(i.quantity)&&validQty(i.freeQuantity??0))&&Array.isArray(r.payments)&&r.payments.every(validLedgerEntry)&&Array.isArray(r.refunds)&&r.refunds.every(validLedgerEntry)))return false;
-  return true;
-}
 function validCartItem(i){return !!i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0&&Number.isFinite(Number(i.freeQuantity??0))&&Number(i.freeQuantity??0)>=0;}
 function validCartPayload(c){return !!c&&typeof c==="object"&&Array.isArray(c.cart)&&c.cart.every(validCartItem);}
 function validSavedCartPayload(list){return Array.isArray(list)&&list.every(s=>s&&typeof s.id==="string"&&Array.isArray(s.cart)&&s.cart.every(validCartItem));}
@@ -2491,11 +2470,6 @@ function makeRecordId(){return Date.now().toString(36)+Math.random().toString(36
 function saveBusinessData(next){
   try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(next));businessData=next;return true;}
   catch(e){console.error(e);setStatus("Could not save business data. Check browser storage space.");return false;}
-}
-function loadBusinessData(){
-  try{const raw=localStorage.getItem(BUSINESS_STORAGE_KEY);if(!raw){businessData=emptyBusinessData();return;}
-    const d=JSON.parse(raw);if(!validBusinessData(d))throw new Error("Invalid business data");businessData=d;
-  }catch(e){console.error(e);businessData=emptyBusinessData();setStatus("Business data could not be read. Import a valid backup to restore it.");}
 }
 function getStockQuantity(key){return Math.max(0,Number(businessData.inventory[key]?.quantity)||0);}
 function getSaleStockLimit(key){
@@ -2509,47 +2483,11 @@ function getSaleStockLimit(key){
 }
 function productSnapshot(item){return {key:item.key,product:{name:String(item.product.name||""),MRP:numericValue(item.product.MRP),DP:numericValue(item.product.DP),pv:numericValue(item.product.pv)}};}
 function getInventoryTotals(){return Object.values(businessData.inventory).reduce((t,i)=>{const q=Math.max(0,Number(i.quantity)||0);t.mrp+=numericValue(i.product?.MRP)*q;t.dp+=numericValue(i.product?.DP)*q;t.pv+=numericValue(i.product?.pv)*q;return t;},{mrp:0,dp:0,pv:0});}
-function renderInventory(){
-  const t=getInventoryTotals();$("stockMrpValue").textContent=formatCartMoney(t.mrp);$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
-  const el=$("stockList");if(el&&!el.classList.contains("hidden")){
-    const rows=Object.entries(businessData.inventory).filter(([,i])=>Number(i.quantity)>0).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
-    el.innerHTML=rows.length?rows.map(([k,i])=>'<div class="business-row"><div><strong>'+escapeHtml(i.product.name)+'</strong><small>MRP '+escapeHtml(formatMoney(i.product.MRP))+' · DP '+escapeHtml(formatMoney(i.product.DP))+' · PV '+escapeHtml(i.product.pv??0)+'</small></div><strong>'+Number(i.quantity)+'</strong></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
-  }
-}
 function renderStockHistory(){
   const el=$("stockHistoryList");const records=businessData.stockIns||[];
   el.innerHTML=records.length?records.map(r=>{const d=new Date(r.createdAt);const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" × "+i.quantity+" (MRP "+formatMoney(i.product.MRP)+", DP "+formatMoney(i.product.DP)+", PV "+i.product.pv+")").join("<br>");
     return '<div class="history-card"><strong>'+escapeHtml(r.name||"Stock-in")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>DP value: '+formatCartMoney(r.totalDP)+' · MRP '+formatCartMoney(r.totalMRP)+' · PV '+Number(r.totalPV||0).toLocaleString("en-IN")+'</strong></div></div>';}).join(""):'<div class="business-muted">No stock-in history yet.</div>';
 }
-function renderSalesHistory(){
-  const el=$("salesHistoryList");const records=businessData.sales||[];
-  el.innerHTML=records.length?records.map(r=>{
-    const gross=(r.payments||[]).reduce((s,p)=>s+Number(p.amount||0),0),refund=(r.refunds||[]).reduce((s,p)=>s+Number(p.amount||0),0),net=gross-refund,balance=Number(r.total||0)-net;
-    const status=balance>0.009?(net<=0?"Unpaid":"Partially paid"):(balance< -0.009?"Refund due":"Paid");
-    const d=new Date(r.createdAt),canEdit=Date.now()-d.getTime()<=7*86400000;
-    const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" · paid "+i.quantity+" · free "+(i.freeQuantity||0)).join("<br>");
-    const ledger=[...(r.payments||[]).map(p=>({kind:"Payment",...p})),...(r.refunds||[]).map(p=>({kind:"Refund",...p}))].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-    const ledgerHtml=ledger.map(p=>escapeHtml(p.kind)+" "+formatCartMoney(p.amount)+" · "+escapeHtml(p.method)+" · "+escapeHtml(new Date(p.createdAt).toLocaleString("en-IN"))).join("<br>");
-    const revisionHtml=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
-    return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>Sale '+formatCartMoney(r.total)+' · Net received '+formatCartMoney(net)+' · Balance '+formatCartMoney(balance)+' · '+status+'</strong>'+(ledgerHtml?'<br><br>'+ledgerHtml:'')+(revisionHtml?'<br><br>'+revisionHtml:'')+'</div><div class="business-actions"><button data-sale-action="payment" data-sale-id="'+escapeHtml(r.id)+'">Add payment</button><button data-sale-action="refund" data-sale-id="'+escapeHtml(r.id)+'">Record refund</button>'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / return</button>':'')+'</div></div>';
-  }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
-}
-function setBusinessMode(mode){
-  const requested=mode==="selling"?"selling":"stocking";
-  if(editingSaleId&&requested!=="selling"){alert("Finish or cancel the sale edit before switching to Stocking mode.");return;}
-  if(requested!==currentMode&&cart.length&&!editingSaleId){
-    if(!confirm("You have an unsaved cart. Switching modes will clear it. Continue?"))return;
-    cart=[];cartName="";$("cartName").value="";saveCartToStorage();
-  }
-  currentMode=requested;
-  $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
-  $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("salesPanel").classList.toggle("hidden",currentMode!=="selling");
-  $("cartName").previousElementSibling.textContent=currentMode==="stocking"?"Stock-in reference (optional)":"Customer name (optional)";
-  $("cartName").placeholder=currentMode==="stocking"?"Optional stock-in note":"Enter customer name";
-  $("cartSection").querySelector("h2").textContent=currentMode==="stocking"?"Stock-In Cart":"Selling Cart";
-  renderCart();renderInventory();if(currentMode==="selling")renderSalesHistory();
-}
-function recordPayment(sale,amount,method){sale.payments=Array.isArray(sale.payments)?sale.payments:[];sale.payments.push({id:makeRecordId(),createdAt:new Date().toISOString(),amount,method});}
 function postStockIn(){
   const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add at least one product with a positive quantity.");return;}
   const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData));
@@ -2558,66 +2496,200 @@ function postStockIn(){
   next.stockIns.unshift({id:makeRecordId(),name:cartName.trim()||"Stock-in",createdAt:now,items:snapshot,totalDP:snapshot.reduce((s,i)=>s+i.product.DP*i.quantity,0),totalMRP:snapshot.reduce((s,i)=>s+i.product.MRP*i.quantity,0),totalPV:snapshot.reduce((s,i)=>s+i.product.pv*i.quantity,0)});
   if(!saveBusinessData(next))return;cart=[];cartName="";$("cartName").value="";saveCartToStorage();renderCart();renderInventory();renderStockHistory();setStatus("Stock-in saved. Available stock has increased.");
 }
-function saleTotal(items){return items.reduce((s,i)=>s+numericValue(i.product.DP)*Number(i.quantity),0);}
+function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(currentMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;$("postTransactionBtn").disabled=!cart.length;}}
+function setupSalesUI(){
+  const style=document.createElement("style");
+  style.textContent=".business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.sale-type-switch button{background:var(--secondary-bg);color:var(--subtle-text);border:1px solid var(--line);min-height:48px}.sale-type-switch button.active{background:var(--green);color:var(--primary-text);border-color:var(--green)}.sale-type-switch small{display:block;font-size:11px;font-weight:500;margin-top:3px}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:grid;grid-template-columns:minmax(0,4fr) minmax(82px,1fr);gap:8px;margin:12px 0}.sale-product-picker select,.sale-date-field input{width:100%;min-width:0;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}.sale-product-picker button{min-width:0;padding:9px 5px;font-size:12px}.sale-date-field{margin:10px 0}.sale-date-field label{display:block;font-size:13px;color:var(--muted);font-weight:650;margin-bottom:6px}.sale-history-heading{margin:18px 0 10px}.sale-history-heading h3{font-size:17px;margin:0}.history-card .business-actions{display:flex;flex-wrap:wrap}.history-card .business-actions button{flex:1 1 110px}.danger-action{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}@media(max-width:420px){.business-stat strong,.sales-overview .business-stat strong{font-size:18px}}";
+  document.head.querySelector("style").appendChild(style);
+  const mrp=$("stockMrpValue");if(mrp)mrp.closest(".business-stat").remove();
+  const history=$("salesHistoryList"),section=document.createElement("section");
+  section.id="salesHistorySection";section.className="hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div>';
+  history.classList.remove("hidden");section.appendChild(history);$("postTransactionBtn").insertAdjacentElement("afterend",section);
+  const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
+  controls.innerHTML='<div class="sale-type-switch" role="group" aria-label="Sale type"><button type="button" id="actualSaleBtn" class="active">Actual Sale<small>Deducts stock</small></button><button type="button" id="recordSaleBtn">Record Sale<small>Does not deduct stock</small></button></div><div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">Add Selected</button></div>';
+  $("cartName").insertAdjacentElement("afterend",controls);
+  const oldPanel=$("salesPanel");if(oldPanel)oldPanel.remove();
+  $("saleDateInput").value=formatLocalDateTimeInput(new Date());
+}
+function formatLocalDateTimeInput(value){
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return "";
+  const p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+function normalizeBusinessData(data){
+  const copy=JSON.parse(JSON.stringify(data));
+  copy.sales=(copy.sales||[]).map(s=>{const n={...s,saleType:s.saleType==="record"?"record":"actual",saleDate:s.saleDate||s.createdAt};delete n.payments;delete n.refunds;return n;});
+  return copy;
+}
+function validBusinessData(d){
+  if(!d||d.schemaVersion!==1||!d.inventory||typeof d.inventory!=="object"||Array.isArray(d.inventory)||!Array.isArray(d.stockIns)||!Array.isArray(d.sales))return false;
+  const vp=p=>p&&typeof p.name==="string"&&Number.isFinite(Number(p.MRP))&&Number.isFinite(Number(p.DP))&&Number.isFinite(Number(p.pv));
+  const vl=i=>i&&typeof i.key==="string"&&vp(i.product),vq=q=>Number.isFinite(Number(q))&&Number(q)>=0;
+  if(!Object.values(d.inventory).every(i=>i&&vp(i.product)&&vq(i.quantity)))return false;
+  if(!d.stockIns.every(r=>r&&typeof r.id==="string"&&Array.isArray(r.items)&&r.items.every(i=>vl(i)&&Number(i.quantity)>0)))return false;
+  return d.sales.every(r=>r&&typeof r.id==="string"&&typeof r.createdAt==="string"&&Number.isFinite(Number(r.total))&&Number(r.total)>=0&&Array.isArray(r.items)&&r.items.every(i=>vl(i)&&vq(i.quantity)&&vq(i.freeQuantity??0))&&(!r.saleType||["actual","record"].includes(r.saleType))&&(!r.saleDate||typeof r.saleDate==="string"));
+}
+function loadBusinessData(){
+  try{const raw=localStorage.getItem(BUSINESS_STORAGE_KEY);if(!raw){businessData=emptyBusinessData();return;}
+    const d=JSON.parse(raw);if(!validBusinessData(d))throw new Error("Invalid business data");
+    businessData=normalizeBusinessData(d);localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(businessData));
+  }catch(e){console.error(e);businessData=emptyBusinessData();setStatus("Business data could not be read. Import a valid backup to restore it.");}
+}
+function getSaleStockLimit(key){
+  let limit=getStockQuantity(key);
+  if(editingSaleId){const old=businessData.sales.find(s=>s.id===editingSaleId),line=old?.items?.find(i=>i.key===key);if((old?.saleType||"actual")==="actual")limit+=(Number(line?.quantity)||0)+(Number(line?.freeQuantity)||0);}
+  return limit;
+}
+function addSelectedProductToCart(){
+  if(!selectedProduct)return;
+  const p=selectedProduct,key=getCartProductKey(p),old=cart.find(i=>i.key===key);if(!key)return;
+  if(currentMode==="selling"&&saleType==="actual"&&(Number(old?.quantity)||0)+1>getSaleStockLimit(key)){alert("No additional stock is available for "+p.name+".");return;}
+  if(old)old.quantity+=1;else cart.push({key,product:{name:p.name,MRP:p.MRP,DP:p.DP,pv:p.pv},quantity:1,freeQuantity:0,quantityIncludesFree:true});
+  saveCartToStorage();renderCart();setStatus("Added to cart: "+p.name+".");
+}
+function changeCartQuantity(key,change){
+  const item=cart.find(i=>i.key===key);if(!item)return;
+  if(currentMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){alert("You cannot add more than the available stock for "+item.product.name+".");return;}
+  item.quantity=Math.max(0,Number(item.quantity)+change);item.freeQuantity=Math.min(Number(item.freeQuantity)||0,item.quantity);
+  if(item.quantity===0)cart=cart.filter(x=>x!==item);saveCartToStorage();renderCart();
+}
+function renderSaleProductOptions(){
+  const select=$("saleProductSelect");if(!select)return;
+  const selected=select.value,rows=Object.entries(businessData.inventory||{}).filter(([,v])=>Number(v.quantity)>0).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
+  select.innerHTML='<option value="">Select product from available stock</option>'+rows.map(([k,v])=>'<option value="'+escapeHtml(k)+'">'+escapeHtml(v.product.name)+' · Qty '+Number(v.quantity)+'</option>').join("");
+  if(rows.some(([k])=>k===selected))select.value=selected;$("addStockProductBtn").disabled=!rows.length;
+}
+function addStockProductToCart(){
+  const key=$("saleProductSelect").value;if(!key)return alert("Select a product first.");
+  const inv=businessData.inventory[key];if(!inv||Number(inv.quantity)<=0)return alert("This product is not currently available in stock.");
+  const old=cart.find(i=>i.key===key);
+  if(saleType==="actual"&&Number(old?.quantity||0)+1>getSaleStockLimit(key))return alert("No additional stock is available for "+inv.product.name+".");
+  if(old)old.quantity+=1;else cart.push({key,product:{...inv.product},quantity:1,freeQuantity:0,quantityIncludesFree:true});
+  saveCartToStorage();renderCart();$("saleProductSelect").value="";setStatus("Added "+inv.product.name+" to the sale cart.");
+}
+function renderInventory(){
+  const t=getInventoryTotals();$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
+  const el=$("stockList");if(el&&!el.classList.contains("hidden")){
+    const rows=Object.entries(businessData.inventory).filter(([,v])=>Number(v.quantity)>0).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
+    el.innerHTML=rows.length?rows.map(([k,v])=>'<div class="business-row"><div><strong>'+escapeHtml(v.product.name)+'</strong><small>MRP '+escapeHtml(formatMoney(v.product.MRP))+' · DP '+escapeHtml(formatMoney(v.product.DP))+' · PV '+escapeHtml(v.product.pv??0)+'</small></div><strong>'+Number(v.quantity)+'</strong></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
+  }renderSaleProductOptions();
+}
+function renderSalesOverview(){
+  const now=new Date();let today=0,month=0;
+  for(const sale of businessData.sales||[]){const d=new Date(sale.saleDate||sale.createdAt);if(Number.isNaN(d.getTime()))continue;
+    if(d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate())today+=Number(sale.total)||0;
+    if(d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth())month+=Number(sale.total)||0;}
+  $("salesTodayValue").textContent=formatCartMoney(today);$("salesMonthValue").textContent=formatCartMoney(month);
+}
+function setSaleType(type){
+  const next=type==="record"?"record":"actual";
+  if(editingSaleId){const old=businessData.sales.find(s=>s.id===editingSaleId);if(old&&(old.saleType||"actual")!==next&&!confirm("Changing sale type will "+(next==="actual"?"deduct quantities from stock.":"return previously deducted quantities to stock.")+" Continue?"))return;}
+  saleType=next;if(saleType==="record"&&!$("saleDateInput").value)$("saleDateInput").value=formatLocalDateTimeInput(new Date());
+  $("actualSaleBtn").classList.toggle("active",saleType==="actual");$("recordSaleBtn").classList.toggle("active",saleType==="record");$("saleDateField").classList.toggle("hidden",saleType!=="record");renderCart();
+}
+function setBusinessMode(mode){
+  const requested=mode==="selling"?"selling":"stocking";
+  if(editingSaleId&&requested!=="selling"){alert("Finish or cancel the sale edit before switching to Stocking mode.");return;}
+  if(requested!==currentMode&&cart.length&&!editingSaleId){if(!confirm("You have an unsaved cart. Switching modes will clear it. Continue?"))return;cart=[];cartName="";$("cartName").value="";saveCartToStorage();}
+  currentMode=requested;if(currentMode==="selling"&&!editingSaleId)saleType="actual";
+  $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
+  $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");$("salesHistorySection").classList.toggle("hidden",currentMode!=="selling");
+  $("cartName").previousElementSibling.textContent=currentMode==="stocking"?"Stock-in reference (optional)":"Customer name (optional)";
+  $("cartName").placeholder=currentMode==="stocking"?"Optional stock-in note":"Enter customer name";$("cartSection").querySelector("h2").textContent=currentMode==="stocking"?"Stock-In Cart":"Selling";
+  $("actualSaleBtn").classList.toggle("active",saleType==="actual");$("recordSaleBtn").classList.toggle("active",saleType==="record");$("saleDateField").classList.toggle("hidden",saleType!=="record");
+  renderCart();renderInventory();renderSalesHistory();renderSalesOverview();
+}
+function renderCart(){
+  legacyRenderCart();
+  $("postTransactionBtn").textContent=currentMode==="stocking"?"SAVE STOCK-IN":(editingSaleId?"SAVE SALE CHANGES":(saleType==="record"?"SAVE RECORD SALE":"SAVE ACTUAL SALE"));
+  const label=$("totalDP").previousElementSibling;if(label)label.textContent=currentMode==="selling"?"Sale amount":"Total DP";
+}
+
+function selectedSaleDate(){
+  if(saleType==="actual"){const old=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;return old?.saleDate||old?.createdAt||new Date().toISOString();}
+  const value=$("saleDateInput").value;if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toISOString();
+}
+function saleTotal(items){return items.reduce((sum,item)=>sum+numericValue(item.product.DP)*Number(item.quantity),0);}
 function postSale(){
-  const items=cart.filter(i=>Number(i.quantity)>0||Number(i.freeQuantity)>0);if(!items.length){alert("Add products before saving the sale.");return;}
-  let oldSale=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;
-  if(editingSaleId&&!oldSale){alert("Sale not found. Reload and try again.");return;}
+  const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add products before saving the sale.");return;}
+  const oldSale=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;if(editingSaleId&&!oldSale){alert("Sale not found. Reload and try again.");return;}
   if(oldSale&&Date.now()-new Date(oldSale.createdAt).getTime()>7*86400000){alert("Sales can only be edited within 7 days of the original sale.");return;}
-  for(const i of items){const old=oldSale?.items?.find(x=>x.key===i.key),available=getStockQuantity(i.key)+(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),needed=Number(i.quantity),free=Number(i.freeQuantity)||0;if(free>needed){alert("Free quantity cannot exceed total quantity for "+i.product.name+".");return;}if(needed>available){alert("Insufficient stock for "+i.product.name+". Available: "+available+", required: "+needed+".");return;}}
-  const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData));let sale=editingSaleId?next.sales.find(s=>s.id===editingSaleId):null;
-  const oldItems=sale?sale.items:[],newItems=items.map(i=>({...productSnapshot(i),quantity:Math.max(0,Number(i.quantity)-(Number(i.freeQuantity)||0)),freeQuantity:Number(i.freeQuantity)||0}));
+  const saleDate=selectedSaleDate();if(!saleDate){alert("Choose a valid date and time for this Record Sale.");return;}
+  for(const item of items)if((Number(item.freeQuantity)||0)>Number(item.quantity)){alert("Free quantity cannot exceed total quantity for "+item.product.name+".");return;}
+  const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData)),sale=editingSaleId?next.sales.find(s=>s.id===editingSaleId):null;
+  const oldItems=sale?sale.items||[]:[],oldType=oldSale?.saleType||"actual";
+  const newItems=items.map(item=>({...productSnapshot(item),quantity:Math.max(0,Number(item.quantity)-(Number(item.freeQuantity)||0)),freeQuantity:Number(item.freeQuantity)||0}));
   const keys=new Set([...oldItems.map(i=>i.key),...newItems.map(i=>i.key)]);
-  for(const key of keys){const old=oldItems.find(i=>i.key===key),fresh=newItems.find(i=>i.key===key),oldQ=(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0),newQ=(Number(fresh?.quantity)||0)+(Number(fresh?.freeQuantity)||0),delta=newQ-oldQ,current=Number(next.inventory[key]?.quantity)||0;
-    if(delta>current){alert("Insufficient stock to add more units of "+(fresh?.product.name||old?.product.name)+".");return;}
-    next.inventory[key]={product:fresh?.product||old?.product,quantity:current-delta,updatedAt:now};
+  for(const key of keys){
+    const old=oldItems.find(i=>i.key===key),fresh=newItems.find(i=>i.key===key);
+    const oldQty=oldType==="actual"?(Number(old?.quantity)||0)+(Number(old?.freeQuantity)||0):0;
+    const newQty=saleType==="actual"?(Number(fresh?.quantity)||0)+(Number(fresh?.freeQuantity)||0):0;
+    const current=Number(next.inventory[key]?.quantity)||0,adjusted=current+oldQty-newQty;
+    if(adjusted<0){alert("Insufficient stock for "+(fresh?.product.name||old?.product.name)+". Available: "+(current+oldQty)+", required: "+newQty+".");return;}
+    if(old||fresh||next.inventory[key])next.inventory[key]={product:fresh?.product||old?.product||next.inventory[key]?.product,quantity:adjusted,updatedAt:now};
   }
   const total=saleTotal(newItems);
-  if(!sale){sale={id:makeRecordId(),createdAt:now,customerName:cartName.trim(),items:newItems,total,payments:[],refunds:[],revisions:[]};next.sales.unshift(sale);}
-  else{sale.revisions=Array.isArray(sale.revisions)?sale.revisions:[];sale.revisions.push({revisedAt:now,previousTotal:sale.total,previousItems:JSON.parse(JSON.stringify(sale.items))});sale.items=newItems;sale.total=total;sale.updatedAt=now;sale.customerName=cartName.trim()||sale.customerName||"";}
-  if(!editingSaleId){const received=Math.round(Math.max(0,Number($("receivedNow").value)||0)*100)/100,method=$("receivedMethod").value;if(received>0){if(!method){alert("Choose Cash or Online for the amount received.");return;}if(received>total+0.001){alert("Amount received cannot exceed the sale total.");return;}recordPayment(sale,received,method);}}
-  if(!saveBusinessData(next))return;editingSaleId=null;cart=[];cartName="";$("cartName").value="";$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();renderInventory();renderSalesHistory();setStatus("Sale saved. Stock adjusted; payment status is shown in Sales history.");
+  if(!sale)next.sales.unshift({id:makeRecordId(),createdAt:now,saleDate,saleType,customerName:cartName.trim(),items:newItems,total,revisions:[]});
+  else{sale.revisions=Array.isArray(sale.revisions)?sale.revisions:[];sale.revisions.push({revisedAt:now,previousTotal:sale.total,previousItems:JSON.parse(JSON.stringify(sale.items)),previousSaleType:oldType,previousSaleDate:sale.saleDate||sale.createdAt});sale.items=newItems;sale.total=total;sale.saleType=saleType;sale.saleDate=saleDate;sale.updatedAt=now;sale.customerName=cartName.trim()||sale.customerName||"";delete sale.payments;delete sale.refunds;}
+  if(!saveBusinessData(next))return;
+  const savedType=saleType;editingSaleId=null;cart=[];cartName="";$("cartName").value="";saleType="actual";$("saleDateInput").value=formatLocalDateTimeInput(new Date());saveCartToStorage();renderCart();renderInventory();renderSalesHistory();renderSalesOverview();
+  setStatus(savedType==="actual"?"Actual Sale saved. Stock has been deducted.":"Record Sale saved. Stock was not changed.");
 }
-function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(currentMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;$("postTransactionBtn").disabled=!cart.length;}}
-function recordSalePayment(id){
-  const next=JSON.parse(JSON.stringify(businessData)),s=next.sales.find(x=>x.id===id);if(!s)return;
-  const raw=prompt("Payment amount received (₹):");if(raw===null)return;const amount=Math.round(Number(raw)*100)/100;if(!Number.isFinite(amount)||amount<=0)return alert("Enter a valid amount greater than zero.");
-  const paid=(s.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),refunded=(s.refunds||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),remaining=Math.max(0,Number(s.total||0)-paid+refunded);
-  if(amount>remaining+0.001)return alert("Payment cannot exceed the outstanding balance of ₹"+remaining.toFixed(2)+".");
-  const method=prompt("Payment method: type Cash or Online");if(method===null)return;const m=method.trim().toLowerCase();if(!["cash","online"].includes(m))return alert("Payment method must be Cash or Online.");
-  recordPayment(s,amount,m==="cash"?"Cash":"Online");if(saveBusinessData(next))renderSalesHistory();
+function deleteSale(id){
+  const original=businessData.sales.find(s=>s.id===id);if(!original)return;
+  if(editingSaleId===id){if(!confirm("This sale is being edited. Cancel the edit and delete the saved sale?"))return;editingSaleId=null;cart=[];cartName="";$("cartName").value="";saveCartToStorage();}
+  else if(!confirm("Permanently delete this sale record?"+((original.saleType||"actual")==="actual"?" Its deducted quantities will be returned to stock.":" Stock will remain unchanged.")))return;
+  const next=JSON.parse(JSON.stringify(businessData)),target=next.sales.find(s=>s.id===id);
+  if((target.saleType||"actual")==="actual"){const now=new Date().toISOString();for(const item of target.items||[]){const qty=(Number(item.quantity)||0)+(Number(item.freeQuantity)||0),current=Number(next.inventory[item.key]?.quantity)||0;next.inventory[item.key]={product:item.product,quantity:current+qty,updatedAt:now};}}
+  next.sales=next.sales.filter(s=>s.id!==id);
+  if(saveBusinessData(next)){renderInventory();renderSalesHistory();renderSalesOverview();renderCart();setStatus("Sale deleted. Sales totals and stock have been updated.");}
 }
-function recordSaleRefund(id){
-  const next=JSON.parse(JSON.stringify(businessData)),s=next.sales.find(x=>x.id===id);if(!s)return;
-  const received=(s.payments||[]).reduce((a,p)=>a+Number(p.amount||0),0),refunded=(s.refunds||[]).reduce((a,p)=>a+Number(p.amount||0),0),due=Math.max(0,received-refunded-Number(s.total||0));
-  if(due<=0.009)return alert("There is no refund due for this sale.");
-  const raw=prompt("Refund amount (up to ₹"+due.toFixed(2)+"):");if(raw===null)return;const amount=Math.round(Number(raw)*100)/100;if(!Number.isFinite(amount)||amount<=0||amount>due+0.001)return alert("Enter a valid amount not exceeding the refund due.");
-  const method=prompt("Refund method: type Cash or Online");if(method===null)return;const m=method.trim().toLowerCase();if(!["cash","online"].includes(m))return alert("Refund method must be Cash or Online.");
-  s.refunds=Array.isArray(s.refunds)?s.refunds:[];s.refunds.push({id:makeRecordId(),createdAt:new Date().toISOString(),amount,method:m==="cash"?"Cash":"Online"});if(saveBusinessData(next))renderSalesHistory();
+function renderSalesHistory(){
+  const el=$("salesHistoryList"),records=businessData.sales||[];
+  el.innerHTML=records.length?records.map(r=>{
+    const d=new Date(r.saleDate||r.createdAt),canEdit=Date.now()-new Date(r.createdAt).getTime()<=7*86400000;
+    const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" · paid "+Number(i.quantity||0)+" · free "+Number(i.freeQuantity||0)).join("<br>");
+    const qty=(r.items||[]).reduce((sum,i)=>sum+Number(i.quantity||0)+Number(i.freeQuantity||0),0);
+    const pv=(r.items||[]).reduce((sum,i)=>sum+numericValue(i.product?.pv)*Number(i.quantity||0),0);
+    const type=(r.saleType||"actual")==="record"?"Record Sale":"Actual Sale";
+    const revisions=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
+    return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+' · '+type+'</small><div class="history-detail">'+lines+'<br><strong>Total quantity: '+qty+'<br>Amount sold: '+formatCartMoney(r.total)+'<br>Total PV: '+pv.toLocaleString("en-IN",{maximumFractionDigits:2})+'</strong>'+(revisions?'<br><br>'+revisions:'')+'</div><div class="business-actions">'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / Return</button>':'')+'<button class="danger-action" data-sale-action="delete" data-sale-id="'+escapeHtml(r.id)+'">Delete</button></div></div>';
+  }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
 }
 function beginSaleEdit(id){
-  const s=businessData.sales.find(x=>x.id===id);if(!s)return;if(Date.now()-new Date(s.createdAt).getTime()>7*86400000)return alert("This sale is older than 7 days and cannot be edited.");
+  const sale=businessData.sales.find(s=>s.id===id);if(!sale)return;
+  if(Date.now()-new Date(sale.createdAt).getTime()>7*86400000)return alert("This sale is older than 7 days and cannot be edited.");
   if(cart.length&&!confirm("Replace the current cart with this sale for editing?"))return;
-  editingSaleId=id;setBusinessMode("selling");cart=(s.items||[]).map(i=>({key:i.key,product:i.product,quantity:(Number(i.quantity)||0)+(Number(i.freeQuantity)||0),freeQuantity:Number(i.freeQuantity)||0,quantityIncludesFree:true}));cartName=s.customerName||"";$("cartName").value=cartName;$("receivedNow").value="";$("receivedMethod").value="";saveCartToStorage();renderCart();$("cartSection").scrollIntoView({behavior:"smooth",block:"start"});setStatus("Editing sale. Previous payments and refunds will be preserved.");
+  editingSaleId=id;saleType=(sale.saleType||"actual")==="record"?"record":"actual";setBusinessMode("selling");
+  $("saleDateInput").value=formatLocalDateTimeInput(sale.saleDate||sale.createdAt);
+  cart=(sale.items||[]).map(i=>({key:i.key,product:i.product,quantity:(Number(i.quantity)||0)+(Number(i.freeQuantity)||0),freeQuantity:Number(i.freeQuantity)||0,quantityIncludesFree:true}));
+  cartName=sale.customerName||"";$("cartName").value=cartName;saveCartToStorage();renderCart();$("cartSection").scrollIntoView({behavior:"smooth",block:"start"});setStatus("Editing sale. Update the cart and save the changes.");
 }
-function handleSalesHistoryClick(e){const b=e.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="payment")recordSalePayment(id);if(b.dataset.saleAction==="refund")recordSaleRefund(id);if(b.dataset.saleAction==="edit")beginSaleEdit(id);}
+function handleSalesHistoryClick(event){const b=event.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="edit")beginSaleEdit(id);if(b.dataset.saleAction==="delete")deleteSale(id);}
 function exportBusinessBackup(){
-  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData,activeCart:{cartName,cart},savedCarts};
+  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart},savedCarts};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="product-scanner-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);setStatus("Backup exported to this device.");
 }
-async function importBusinessBackup(e){
-  const input=e.target,file=input.files?.[0];if(!file)return;
-  try{const p=JSON.parse(await file.text());if(p?.app!=="Product Scanner Vestige"||p.backupVersion!==1||!validBusinessData(p.businessData)||!validCartPayload(p.activeCart||{cart:[]})||!validSavedCartPayload(p.savedCarts||[]))throw new Error("Unsupported or invalid Product Scanner backup.");
-    if(!confirm("Import this backup and replace the stock, history, payments, refunds, active cart and saved carts in this browser? This cannot be undone."))return;
-    const old={b:localStorage.getItem(BUSINESS_STORAGE_KEY),c:localStorage.getItem(CART_STORAGE_KEY),s:localStorage.getItem(SAVED_CARTS_STORAGE_KEY)};
-    try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(p.businessData));localStorage.setItem(CART_STORAGE_KEY,JSON.stringify(p.activeCart||{cartName:"",cart:[]}));localStorage.setItem(SAVED_CARTS_STORAGE_KEY,JSON.stringify(Array.isArray(p.savedCarts)?p.savedCarts:[]));}
-    catch(err){try{old.b===null?localStorage.removeItem(BUSINESS_STORAGE_KEY):localStorage.setItem(BUSINESS_STORAGE_KEY,old.b);old.c===null?localStorage.removeItem(CART_STORAGE_KEY):localStorage.setItem(CART_STORAGE_KEY,old.c);old.s===null?localStorage.removeItem(SAVED_CARTS_STORAGE_KEY):localStorage.setItem(SAVED_CARTS_STORAGE_KEY,old.s);}catch(rollback){console.error(rollback);}throw err;}
-    businessData=p.businessData;loadCartFromStorage();loadSavedCartsFromStorage();renderInventory();renderStockHistory();renderSalesHistory();alert("Backup imported successfully.");setStatus("Backup restored in this browser.");
-  }catch(err){alert("Backup import failed: "+(err?.message||String(err)));}finally{input.value="";}
+async function importBusinessBackup(event){
+  const input=event.target,file=input.files?.[0];if(!file)return;
+  try{
+    const p=JSON.parse(await file.text());
+    if(p?.app!=="Product Scanner Vestige"||p.backupVersion!==1||!validBusinessData(p.businessData)||!validCartPayload(p.activeCart||{cart:[]})||!validSavedCartPayload(p.savedCarts||[]))throw new Error("Unsupported or invalid Product Scanner backup.");
+    if(!confirm("Import this backup and replace stock, stock-in history, sales history, active cart and saved carts in this browser? This cannot be undone."))return;
+    const migrated=normalizeBusinessData(p.businessData),old={b:localStorage.getItem(BUSINESS_STORAGE_KEY),c:localStorage.getItem(CART_STORAGE_KEY),s:localStorage.getItem(SAVED_CARTS_STORAGE_KEY)};
+    try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(migrated));localStorage.setItem(CART_STORAGE_KEY,JSON.stringify(p.activeCart||{cartName:"",cart:[]}));localStorage.setItem(SAVED_CARTS_STORAGE_KEY,JSON.stringify(p.savedCarts||[]));}
+    catch(error){try{old.b===null?localStorage.removeItem(BUSINESS_STORAGE_KEY):localStorage.setItem(BUSINESS_STORAGE_KEY,old.b);old.c===null?localStorage.removeItem(CART_STORAGE_KEY):localStorage.setItem(CART_STORAGE_KEY,old.c);old.s===null?localStorage.removeItem(SAVED_CARTS_STORAGE_KEY):localStorage.setItem(SAVED_CARTS_STORAGE_KEY,old.s);}catch(rollback){console.error(rollback);}throw error;}
+    businessData=migrated;loadCartFromStorage();loadSavedCartsFromStorage();renderInventory();renderStockHistory();renderSalesHistory();renderSalesOverview();alert("Backup imported successfully.");setStatus("Backup restored in this browser.");
+  }catch(error){alert("Backup import failed: "+(error?.message||String(error)));}finally{input.value="";}
 }
-function initializeBusinessFeatures(){loadBusinessData();$("salesHistoryList").addEventListener("click",handleSalesHistoryClick);setBusinessMode("stocking");renderStockHistory();renderSalesHistory();}
+function initializeBusinessFeatures(){
+  loadBusinessData();$("salesHistoryList").addEventListener("click",handleSalesHistoryClick);
+  $("actualSaleBtn").addEventListener("click",()=>setSaleType("actual"));$("recordSaleBtn").addEventListener("click",()=>setSaleType("record"));
+  $("addStockProductBtn").addEventListener("click",addStockProductToCart);$("saleDateInput").value=formatLocalDateTimeInput(new Date());
+  setBusinessMode("stocking");renderStockHistory();renderSalesHistory();renderSalesOverview();
+}
 
-// ==========================================
+
 // PRODUCT MATCHING
 // ==========================================
 
@@ -3656,9 +3728,14 @@ $("scanAgainBtn").addEventListener(
 );
 
 // ==========================================
+
+/* Sales workflow update: Actual Sale / Record Sale */
+let saleType="actual";
+
 // INITIALIZATION
 // ==========================================
 
+setupSalesUI();
 initializeTheme();
 loadCartFromStorage();
 loadSavedCartsFromStorage();
