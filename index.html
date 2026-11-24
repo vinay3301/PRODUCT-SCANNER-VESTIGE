@@ -1375,11 +1375,12 @@ function clearEntireCart() {
   if (!confirmed) return;
 
   cart = [];
+  editingSaleId = null;
 
   saveCartToStorage();
   renderCart();
 
-  setStatus("Current cart cleared.");
+  setStatus("Current cart cleared. Any sale edit has been cancelled.");
 }
 
 // ==========================================
@@ -1512,7 +1513,8 @@ function deleteSavedCart(id) {
 function calculateCartTotals(items) {
 
   const activeItems = items.filter(item =>
-    Number(item.quantity) > 0
+    Number(item.quantity) > 0 ||
+    (currentMode === "selling" && Number(item.freeQuantity) > 0)
   );
 
   const totalQuantity = activeItems.reduce(
@@ -2476,7 +2478,8 @@ function renderSalesHistory(){
     const lines=(r.items||[]).map(i=>escapeHtml(i.product.name)+" · paid "+i.quantity+" · free "+(i.freeQuantity||0)).join("<br>");
     const ledger=[...(r.payments||[]).map(p=>({kind:"Payment",...p})),...(r.refunds||[]).map(p=>({kind:"Refund",...p}))].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
     const ledgerHtml=ledger.map(p=>escapeHtml(p.kind)+" "+formatCartMoney(p.amount)+" · "+escapeHtml(p.method)+" · "+escapeHtml(new Date(p.createdAt).toLocaleString("en-IN"))).join("<br>");
-    return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>Sale '+formatCartMoney(r.total)+' · Net received '+formatCartMoney(net)+' · Balance '+formatCartMoney(balance)+' · '+status+'</strong>'+(ledgerHtml?'<br><br>'+ledgerHtml:'')+'</div><div class="business-actions"><button data-sale-action="payment" data-sale-id="'+escapeHtml(r.id)+'">Add payment</button><button data-sale-action="refund" data-sale-id="'+escapeHtml(r.id)+'">Record refund</button>'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / return</button>':'')+'</div></div>';
+    const revisionHtml=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
+    return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+'</small><div class="history-detail">'+lines+'<br><strong>Sale '+formatCartMoney(r.total)+' · Net received '+formatCartMoney(net)+' · Balance '+formatCartMoney(balance)+' · '+status+'</strong>'+(ledgerHtml?'<br><br>'+ledgerHtml:'')+(revisionHtml?'<br><br>'+revisionHtml:'')+'</div><div class="business-actions"><button data-sale-action="payment" data-sale-id="'+escapeHtml(r.id)+'">Add payment</button><button data-sale-action="refund" data-sale-id="'+escapeHtml(r.id)+'">Record refund</button>'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / return</button>':'')+'</div></div>';
   }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
 }
 function setBusinessMode(mode){
