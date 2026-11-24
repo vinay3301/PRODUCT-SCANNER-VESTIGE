@@ -1541,7 +1541,7 @@ function deleteSavedCart(id) {
 function calculateCartTotals(items) {
   const activeItems=items.filter(item=>Number(item.quantity)>0);
   const totalQuantity=activeItems.reduce((sum,item)=>sum+Number(item.quantity),0);
-  const paidQuantity=item=>Math.max(0,Number(item.quantity)-(currentMode==="selling"?Math.max(0,Number(item.freeQuantity)||0):0));
+  const paidQuantity=item=>Math.max(0,Number(item.quantity)-(cartMode==="selling"?Math.max(0,Number(item.freeQuantity)||0):0));
   const totalDP=activeItems.reduce((sum,item)=>sum+numericValue(item.product.DP)*paidQuantity(item),0);
   const totalPV=activeItems.reduce((sum,item)=>sum+numericValue(item.product.pv)*paidQuantity(item),0);
 
@@ -2527,13 +2527,13 @@ function getSaleStockLimit(key){
 function addSelectedProductToCart(){
   if(!selectedProduct)return;
   const p=selectedProduct,key=getCartProductKey(p),old=cart.find(i=>i.key===key);if(!key)return;
-  if(currentMode==="selling"&&saleType==="actual"&&(Number(old?.quantity)||0)+1>getSaleStockLimit(key)){alert("No additional stock is available for "+p.name+".");return;}
+  if(cartMode==="selling"&&saleType==="actual"&&(Number(old?.quantity)||0)+1>getSaleStockLimit(key)){alert("No additional stock is available for "+p.name+".");return;}
   if(old)old.quantity+=1;else cart.push({key,product:{name:p.name,MRP:p.MRP,DP:p.DP,pv:p.pv},quantity:1,freeQuantity:0,quantityIncludesFree:true});
   saveCartToStorage();renderCart();setStatus("Added to cart: "+p.name+".");
 }
 function changeCartQuantity(key,change){
   const item=cart.find(i=>i.key===key);if(!item)return;
-  if(currentMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){alert("You cannot add more than the available stock for "+item.product.name+".");return;}
+  if(cartMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){alert("You cannot add more than the available stock for "+item.product.name+".");return;}
   item.quantity=Math.max(0,Number(item.quantity)+change);item.freeQuantity=Math.min(Number(item.freeQuantity)||0,item.quantity);
   if(item.quantity===0)cart=cart.filter(x=>x!==item);saveCartToStorage();renderCart();
 }
