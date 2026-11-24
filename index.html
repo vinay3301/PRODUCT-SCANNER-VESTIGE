@@ -2552,11 +2552,28 @@ function addStockProductToCart(){
   if(old)old.quantity+=1;else cart.push({key,product:{...inv.product},quantity:1,freeQuantity:0,quantityIncludesFree:true});
   saveCartToStorage();renderCart();$("saleProductSelect").value="";setStatus("Added "+inv.product.name+" to the sale cart.");
 }
+function limitListToFive(el){
+  if(!el)return;
+  const oldScrollTop=el.scrollTop||0;
+  el.style.overflowY="auto";
+  el.style.overscrollBehavior="contain";
+  el.style.scrollbarGutter="stable";
+  if(el.children.length>5){
+    const first=el.children[0],fifth=el.children[4];
+    const height=fifth.getBoundingClientRect().bottom-first.getBoundingClientRect().top;
+    el.style.maxHeight=Math.ceil(height)+"px";
+  }else{
+    el.style.maxHeight="";
+    el.style.overflowY="visible";
+  }
+  el.scrollTop=oldScrollTop;
+}
 function renderInventory(){
   const t=getInventoryTotals();$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
   const el=$("stockList");if(el&&!el.classList.contains("hidden")){
     const rows=Object.entries(businessData.inventory).sort((a,b)=>String(a[1].product?.name||"").localeCompare(String(b[1].product?.name||"")));
     el.innerHTML=rows.length?rows.map(([k,v])=>'<div class="business-row"><div><strong>'+escapeHtml(v.product.name)+'</strong><small>DP '+escapeHtml(formatMoney(v.product.DP))+' · PV '+escapeHtml(v.product.pv??0)+'</small></div><div class="stock-quantity-controls"><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="-1" aria-label="Decrease stock">−</button><strong>'+Number(v.quantity)+'</strong><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="1" aria-label="Increase stock">+</button></div></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
+    limitListToFive(el);
   }renderSaleProductOptions();updateCheckoutButton();
 }
 function adjustStockQuantity(key,delta){
@@ -2667,6 +2684,7 @@ function renderSalesHistory(){
     const revisions=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
     return '<div class="history-card"><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"))+' · '+type+'</small><div class="history-detail">'+lines+'<br><strong>Total quantity: '+qty+'<br>Amount sold: '+formatCartMoney(r.total)+'<br>Total PV: '+pv.toLocaleString("en-IN",{maximumFractionDigits:2})+'</strong>'+(revisions?'<br><br>'+revisions:'')+'</div><div class="business-actions">'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / Return</button>':'')+'<button class="danger-action" data-sale-action="delete" data-sale-id="'+escapeHtml(r.id)+'">Delete</button></div></div>';
   }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
+  limitListToFive(el);
 }
 function beginSaleEdit(id){
   const sale=businessData.sales.find(s=>s.id===id);if(!sale)return;
