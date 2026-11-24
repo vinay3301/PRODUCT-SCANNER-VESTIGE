@@ -2551,6 +2551,8 @@ function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true
 function recordSalePayment(id){
   const next=JSON.parse(JSON.stringify(businessData)),s=next.sales.find(x=>x.id===id);if(!s)return;
   const raw=prompt("Payment amount received (₹):");if(raw===null)return;const amount=Math.round(Number(raw)*100)/100;if(!Number.isFinite(amount)||amount<=0)return alert("Enter a valid amount greater than zero.");
+  const paid=(s.payments||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),refunded=(s.refunds||[]).reduce((sum,p)=>sum+Number(p.amount||0),0),remaining=Math.max(0,Number(s.total||0)-paid+refunded);
+  if(amount>remaining+0.001)return alert("Payment cannot exceed the outstanding balance of ₹"+remaining.toFixed(2)+".");
   const method=prompt("Payment method: type Cash or Online");if(method===null)return;const m=method.trim().toLowerCase();if(!["cash","online"].includes(m))return alert("Payment method must be Cash or Online.");
   recordPayment(s,amount,m==="cash"?"Cash":"Online");if(saveBusinessData(next))renderSalesHistory();
 }
