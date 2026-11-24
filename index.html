@@ -2449,14 +2449,18 @@ $("cartList").addEventListener("change",event=>{
 function emptyBusinessData(){return {schemaVersion:1,inventory:{},stockIns:[],sales:[]};}
 function validBusinessData(d){
   if(!d||d.schemaVersion!==1||!d.inventory||typeof d.inventory!=="object"||Array.isArray(d.inventory)||!Array.isArray(d.stockIns)||!Array.isArray(d.sales))return false;
-  const validLine=i=>i&&typeof i.key==="string"&&i.product&&typeof i.product.name==="string";
-  if(!Object.values(d.inventory).every(i=>i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0))return false;
+  const validProduct=p=>p&&typeof p.name==="string"&&Number.isFinite(Number(p.MRP))&&Number.isFinite(Number(p.DP))&&Number.isFinite(Number(p.pv));
+  const validLine=i=>i&&typeof i.key==="string"&&validProduct(i.product);
+  const validQty=q=>Number.isFinite(Number(q))&&Number(q)>=0;
+  const validLedgerEntry=e=>e&&typeof e.id==="string"&&typeof e.createdAt==="string"&&Number.isFinite(Number(e.amount))&&Number(e.amount)>0&&["Cash","Online"].includes(e.method);
+  if(!Object.values(d.inventory).every(i=>i&&validProduct(i.product)&&validQty(i.quantity)))return false;
   if(!d.stockIns.every(r=>r&&typeof r.id==="string"&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>0)))return false;
-  if(!d.sales.every(r=>r&&typeof r.id==="string"&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0&&Number.isFinite(Number(i.freeQuantity||0))&&Number(i.freeQuantity||0)>=0)&&Array.isArray(r.payments)&&Array.isArray(r.refunds)))return false;
+  if(!d.sales.every(r=>r&&typeof r.id==="string"&&typeof r.createdAt==="string"&&Number.isFinite(Number(r.total))&&Number(r.total)>=0&&Array.isArray(r.items)&&r.items.every(i=>validLine(i)&&validQty(i.quantity)&&validQty(i.freeQuantity??0))&&Array.isArray(r.payments)&&r.payments.every(validLedgerEntry)&&Array.isArray(r.refunds)&&r.refunds.every(validLedgerEntry)))return false;
   return true;
 }
-function validCartPayload(c){return !!c&&typeof c==="object"&&Array.isArray(c.cart)&&c.cart.every(i=>i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0);}
-function validSavedCartPayload(list){return Array.isArray(list)&&list.every(s=>s&&typeof s.id==="string"&&Array.isArray(s.cart)&&s.cart.every(i=>i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))));}
+function validCartItem(i){return !!i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0&&Number.isFinite(Number(i.freeQuantity??0))&&Number(i.freeQuantity??0)>=0;}
+function validCartPayload(c){return !!c&&typeof c==="object"&&Array.isArray(c.cart)&&c.cart.every(validCartItem);}
+function validSavedCartPayload(list){return Array.isArray(list)&&list.every(s=>s&&typeof s.id==="string"&&Array.isArray(s.cart)&&s.cart.every(validCartItem));}
 function makeRecordId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,9);}
 function saveBusinessData(next){
   try{localStorage.setItem(BUSINESS_STORAGE_KEY,JSON.stringify(next));businessData=next;return true;}
