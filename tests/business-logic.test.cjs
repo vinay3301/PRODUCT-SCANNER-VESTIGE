@@ -420,7 +420,7 @@ test("Stock-in History shows five compact summaries with expandable alphabetized
   assert.match(businessSource, /limitListTo\(el,5,"auto"\)/);
   assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
   assert.match(businessSource, /class="history-detail" id=.*hidden/);
-  assert.match(html, /stockHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
+  assert.ok(html.includes('$("stockHistoryList").addEventListener("click",handleHistoryToggle);'));
   assert.match(businessSource, /\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
 
@@ -513,7 +513,7 @@ test("Sale history shows five compact summaries, expands product details, and so
   assert.match(businessSource, /class="history-summary-toggle" data-history-toggle aria-expanded="false"/);
   assert.match(businessSource, /class="history-detail" id=.*hidden/);
   assert.match(businessSource, /function handleHistoryToggle\(event\)/);
-  assert.match(html, /salesHistoryList\)\.addEventListener\("click",handleHistoryToggle\)/);
+  assert.ok(html.includes('$("salesHistoryList").addEventListener("click",handleHistoryToggle);'));
   assert.match(businessSource, /data-sale-action="edit"/);
   assert.match(businessSource, /data-sale-action="delete"/);
 });
