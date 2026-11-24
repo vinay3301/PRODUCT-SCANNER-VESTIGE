@@ -103,32 +103,32 @@ test("Overselling is rejected without changing stock or history", () => {
 });
 
 test("Unpaid, partial and paid states render correctly", () => {
-  const sale = c.businessData.sales[0];
+  const saleId = c.businessData.sales[0].id;
   c.renderSalesHistory();
   assert.match(h.$("salesHistoryList").innerHTML, /Unpaid/);
   h.prompts.push("30", "Cash");
-  c.recordSalePayment(sale.id);
+  c.recordSalePayment(saleId);
   c.renderSalesHistory();
   assert.match(h.$("salesHistoryList").innerHTML, /Partially paid/);
   h.prompts.push("43", "Online");
-  c.recordSalePayment(sale.id);
+  c.recordSalePayment(saleId);
   c.renderSalesHistory();
   assert.match(h.$("salesHistoryList").innerHTML, /Paid/);
-  assert.equal(sale.payments.length, 2);
+  assert.equal(c.businessData.sales[0].payments.length, 2);
 });
 
 test("Additional payment cannot exceed outstanding balance", () => {
-  const sale = c.businessData.sales[0];
+  const saleId = c.businessData.sales[0].id;
   h.prompts.push("1");
-  c.recordSalePayment(sale.id);
-  assert.equal(sale.payments.length, 2);
+  c.recordSalePayment(saleId);
+  assert.equal(c.businessData.sales[0].payments.length, 2);
   assert.match(h.alerts.at(-1), /cannot exceed the outstanding balance/i);
 });
 
 test("Sale editing applies only inventory delta and preserves payment history", () => {
-  const sale = c.businessData.sales[0];
+  const saleId = c.businessData.sales[0].id;
   c.businessData.inventory[k2] = { product: conditioner, quantity: 2 };
-  c.editingSaleId = sale.id;
+  c.editingSaleId = saleId;
   c.cart = [
     { key: k1, product: assure, quantity: 1, freeQuantity: 0 },
     { key: k2, product: conditioner, quantity: 1, freeQuantity: 0 }
@@ -136,25 +136,25 @@ test("Sale editing applies only inventory delta and preserves payment history", 
   c.postSale();
   assert.equal(c.getStockQuantity(k1), 4); // one returned from the original paid+free pair
   assert.equal(c.getStockQuantity(k2), 1); // one newly added
-  assert.equal(sale.payments.length, 2);
-  assert.equal(sale.revisions.length, 1);
-  assert.equal(sale.total, 353);
+  assert.equal(c.businessData.sales[0].payments.length, 2);
+  assert.equal(c.businessData.sales[0].revisions.length, 1);
+  assert.equal(c.businessData.sales[0].total, 353);
 });
 
 test("Refund entries preserve method and amount", () => {
-  const sale = c.businessData.sales[0];
-  sale.total = 50; // simulate a revised sale total below the amount already received
+  const saleId = c.businessData.sales[0].id;
+  c.businessData.sales[0].total = 50; // simulate a revised sale total below the amount already received
   h.prompts.push("10", "Online");
-  c.recordSaleRefund(sale.id);
-  assert.equal(sale.refunds.length, 1);
-  assert.equal(sale.refunds[0].amount, 10);
-  assert.equal(sale.refunds[0].method, "Online");
+  c.recordSaleRefund(saleId);
+  assert.equal(c.businessData.sales[0].refunds.length, 1);
+  assert.equal(c.businessData.sales[0].refunds[0].amount, 10);
+  assert.equal(c.businessData.sales[0].refunds[0].method, "Online");
 });
 
 test("Sales older than seven days cannot be edited", () => {
-  const sale = c.businessData.sales[0];
-  sale.createdAt = new Date(Date.now() - 8 * 86400000).toISOString();
-  c.editingSaleId = sale.id;
+  const saleId = c.businessData.sales[0].id;
+  c.businessData.sales[0].createdAt = new Date(Date.now() - 8 * 86400000).toISOString();
+  c.editingSaleId = saleId;
   c.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
   const before = c.getStockQuantity(k1);
   c.postSale();
