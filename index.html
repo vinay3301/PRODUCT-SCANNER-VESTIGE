@@ -2652,8 +2652,7 @@ function setSaleType(type){
 }
 function setBusinessMode(mode){
   const requested=mode==="selling"?"selling":"stocking";
-  if(editingSaleId&&requested!=="selling"){alert("Finish or cancel the sale edit before switching to Stock mode.");return;}
-  if(requested!==currentMode&&!cart.length)cartMode=requested;
+  if(requested!==currentMode&&!cart.length){cartMode=requested;saveCartToStorage();}
   currentMode=requested;
   $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
   $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");$("salesHistorySection").classList.toggle("hidden",currentMode!=="selling");
