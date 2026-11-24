@@ -224,3 +224,81 @@ for (const result of results) {
 }
 console.log("\n" + (results.length - failed.length) + "/" + results.length + " tests passed");
 if (failed.length) process.exitCode = 1;
+
+
+async function testAsync(name, fn) {
+  try { await fn(); results.push({ name, status: "PASS" }); }
+  catch (error) { results.push({ name, status: "FAIL", error: error.message }); process.exitCode = 1; }
+}
+(async () => {
+  await testAsync("Valid backup import restores business data and cart storage", async () => {
+    const x = createHarness();
+    const payload = {
+      app: "Product Scanner Vestige", backupVersion: 1,
+      businessData: { schemaVersion: 1, inventory: { [k1]: { product: assure, quantity: 4 } }, stockIns: [], sales: [] },
+      activeCart: { cartName: "Draft", cart: [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }] },
+      savedCarts: [{ id: "saved-1", cart: [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }] }]
+    };
+    const input = x.$("backupFile");
+    input.files = [{ text: async () => JSON.stringify(payload) }];
+    await x.context.importBusinessBackup({ target: input });
+    assert.equal(x.context.getStockQuantity(k1), 4);
+    assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
+    assert.ok(x.storage.has(x.context.CART_STORAGE_KEY));
+    assert.ok(x.storage.has(x.context.SAVED_CARTS_STORAGE_KEY));
+    assert.match(x.alerts.at(-1), /imported successfully/i);
+  });
+
+  await testAsync("Invalid backup import leaves existing browser data untouched", async () => {
+    const x = createHarness();
+    x.storage.set(x.context.BUSINESS_STORAGE_KEY, "keep-business");
+    x.storage.set(x.context.CART_STORAGE_KEY, "keep-cart");
+    x.storage.set(x.context.SAVED_CARTS_STORAGE_KEY, "keep-saved");
+    const payload = {
+      app: "Product Scanner Vestige", backupVersion: 1,
+      businessData: { schemaVersion: 1, inventory: { bad: { product: assure, quantity: -1 } }, stockIns: [], sales: [] },
+      activeCart: { cart: [] }, savedCarts: []
+    };
+    const input = x.$("backupFile");
+    input.files = [{ text: async () => JSON.stringify(payload) }];
+    await x.context.importBusinessBackup({ target: input });
+    assert.equal(x.storage.get(x.context.BUSINESS_STORAGE_KEY), "keep-business");
+    assert.equal(x.storage.get(x.context.CART_STORAGE_KEY), "keep-cart");
+    assert.equal(x.storage.get(x.context.SAVED_CARTS_STORAGE_KEY), "keep-saved");
+    assert.match(x.alerts.at(-1), /import failed/i);
+  });
+
+  await testAsync("Partial backup import storage failure rolls back all previous values", async () => {
+    const x = createHarness();
+    const old = [
+      [x.context.BUSINESS_STORAGE_KEY, "old-business"],
+      [x.context.CART_STORAGE_KEY, "old-cart"],
+      [x.context.SAVED_CARTS_STORAGE_KEY, "old-saved"]
+    ];
+    old.forEach(([k, v]) => x.storage.set(k, v));
+    const originalSet = x.context.localStorage.setItem;
+    let writes = 0;
+    x.context.localStorage.setItem = (k, v) => {
+      writes++;
+      if (writes === 2) throw new Error("QuotaExceededError");
+      originalSet(k, v);
+    };
+    const payload = {
+      app: "Product Scanner Vestige", backupVersion: 1,
+      businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
+      activeCart: { cart: [] }, savedCarts: []
+    };
+    const input = x.$("backupFile");
+    input.files = [{ text: async () => JSON.stringify(payload) }];
+    await x.context.importBusinessBackup({ target: input });
+    old.forEach(([k, v]) => assert.equal(x.storage.get(k), v));
+    assert.match(x.alerts.at(-1), /import failed/i);
+  });
+
+  const asyncResults = results.slice(15);
+  const asyncFailed = asyncResults.filter(r => r.status === "FAIL");
+  console.log("\nBackup import integration checks");
+  for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
+  console.log("\n" + (asyncResults.length - asyncFailed.length) + "/" + asyncResults.length + " backup import checks passed");
+  if (asyncFailed.length) process.exitCode = 1;
+})();
