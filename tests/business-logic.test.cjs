@@ -400,6 +400,34 @@ test("Stock List and Sale History limit the viewport to five entries", () => {
   assert.equal(list.scrollTop, 116);
 });
 
+test("Sale cart viewport shows ten products and scrolls continuously beyond ten", () => {
+  const x = createHarness();
+  const children = Array.from({ length: 12 }, (_, i) => ({
+    getBoundingClientRect: () => ({ top: i * 52, bottom: i * 52 + 45 })
+  }));
+  const list = { children, style: {}, scrollTop: 156 };
+  x.context.limitListToTen(list);
+  assert.equal(list.style.maxHeight, "513px");
+  assert.equal(list.style.overflowY, "auto");
+  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.scrollTop, 156);
+});
+
+test("Stock-in History uses the five-entry scroll viewport", () => {
+  assert.match(businessSource, /function renderStockHistory\(\)[\\s\\S]*?limitListToFive\\(el\\)/);
+});
+
+test("Stock products are sorted alphabetically without case sensitivity", () => {
+  const x = createHarness();
+  const rows = [
+    ["z", { product: { name: "zeta" } }],
+    ["b", { product: { name: "beta" } }],
+    ["a", { product: { name: "Alpha" } }]
+  ];
+  rows.sort(x.context.compareProductEntriesByName);
+  assert.deepEqual(rows.map(row => row[1].product.name), ["Alpha", "beta", "zeta"]);
+});
+
 test("Lists with five or fewer entries do not get an unnecessary scrollbar", () => {
   const x = createHarness();
   const list = {
