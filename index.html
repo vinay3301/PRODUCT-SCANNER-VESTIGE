@@ -1662,7 +1662,7 @@ function renderSavedCarts() {
 // RENDER ACTIVE CART
 // ==========================================
 
-function renderCart() {
+function legacyRenderCart() {
 
   const list = $("cartList");
 
@@ -3766,7 +3766,7 @@ function renderCart(){
   $("postTransactionBtn").textContent=currentMode==="stocking"?"SAVE STOCK-IN":(editingSaleId?"SAVE SALE CHANGES":(saleType==="record"?"SAVE RECORD SALE":"SAVE ACTUAL SALE"));
   const label=$("totalDP").previousElementSibling;if(label)label.textContent=currentMode==="selling"?"Sale amount":"Total DP";
 }
-const legacyRenderCart=renderCart;
+
 function selectedSaleDate(){
   if(saleType==="actual"){const old=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;return old?.saleDate||old?.createdAt||new Date().toISOString();}
   const value=$("saleDateInput").value;if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toISOString();
