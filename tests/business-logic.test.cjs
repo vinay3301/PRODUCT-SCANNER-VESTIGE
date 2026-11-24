@@ -92,12 +92,38 @@ test("Stock valuation uses MRP, DP and PV correctly", () => {
   assert.ok(Math.abs(totals.pv - 9.95) < 0.001);
 });
 
-test("Free quantity deducts stock but not sale value", () => {
+test("Free quantity is included in total quantity and excluded from sale value", () => {
   c.currentMode = "selling";
-  c.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 1 }];
+  c.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 1 }];
   c.postSale();
   assert.equal(c.getStockQuantity(k1), 3);
+  assert.equal(c.businessData.sales[0].items[0].quantity, 1);
+  assert.equal(c.businessData.sales[0].items[0].freeQuantity, 1);
   assert.equal(c.businessData.sales[0].total, 73);
+});
+
+test("One unit can be entirely free when total quantity is one", () => {
+  const x = createHarness();
+  x.context.currentMode = "selling";
+  x.context.businessData.inventory[k1] = { product: assure, quantity: 1 };
+  x.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 1 }];
+  x.context.postSale();
+  assert.equal(x.context.getStockQuantity(k1), 0);
+  assert.equal(x.context.businessData.sales[0].items[0].quantity, 0);
+  assert.equal(x.context.businessData.sales[0].items[0].freeQuantity, 1);
+  assert.equal(x.context.businessData.sales[0].total, 0);
+});
+
+test("Three total units with one free charge for two and deduct three", () => {
+  const x = createHarness();
+  x.context.currentMode = "selling";
+  x.context.businessData.inventory[k1] = { product: assure, quantity: 3 };
+  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
+  x.context.postSale();
+  assert.equal(x.context.getStockQuantity(k1), 0);
+  assert.equal(x.context.businessData.sales[0].items[0].quantity, 2);
+  assert.equal(x.context.businessData.sales[0].items[0].freeQuantity, 1);
+  assert.equal(x.context.businessData.sales[0].total, 146);
 });
 
 test("Overselling is rejected without changing stock or history", () => {
@@ -268,6 +294,7 @@ console.log("\n" + (results.length - failed.length) + "/" + results.length + " t
 if (failed.length) process.exitCode = 1;
 
 
+const synchronousTestCount = results.length;
 async function testAsync(name, fn) {
   try { await fn(); results.push({ name, status: "PASS" }); }
   catch (error) { results.push({ name, status: "FAIL", error: error.message }); process.exitCode = 1; }
@@ -337,7 +364,7 @@ async function testAsync(name, fn) {
     assert.match(x.alerts.at(-1), /import failed/i);
   });
 
-  const asyncResults = results.slice(19);
+  const asyncResults = results.slice(synchronousTestCount);
   const asyncFailed = asyncResults.filter(r => r.status === "FAIL");
   console.log("\nBackup import integration checks");
   for (const result of asyncResults) console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
