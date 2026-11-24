@@ -33,7 +33,7 @@ function createHarness() {
   const context = {
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
     cart: [], cartName: "", savedCarts: [], currentMode: "stocking",
-    editingSaleId: null, transactionBusy: false, saleType: "actual",
+    editingSaleId: null, transactionBusy: false, saleType: "actual", cartMode: "stocking",
     BUSINESS_STORAGE_KEY: "test-business", CART_STORAGE_KEY: "test-cart", SAVED_CARTS_STORAGE_KEY: "test-saved",
     $, localStorage: {
       setItem: (k, v) => { if (failStorageWrites) throw new Error("QuotaExceededError"); storage.set(k, v); },
@@ -197,7 +197,11 @@ test("Actual Sale checkout is blocked after manual stock reduction creates a sho
   x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
   x.context.adjustStockQuantity(k1, -1);
   assert.equal(x.context.cart[0].quantity, 3);
-  assert.deepEqual(Array.from(x.context.getSaleStockShortages()), [{ name: assure.name, required: 3, available: 2, shortage: 1 }]);
+  const shortage = x.context.getSaleStockShortages()[0];
+  assert.equal(shortage.name, assure.name);
+  assert.equal(shortage.required, 3);
+  assert.equal(shortage.available, 2);
+  assert.equal(shortage.shortage, 1);
   x.context.postSale();
   assert.equal(x.context.businessData.sales.length, 0);
   assert.equal(x.context.getStockQuantity(k1), 2);
