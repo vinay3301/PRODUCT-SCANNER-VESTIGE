@@ -675,44 +675,6 @@ button:disabled {
 
 <main>
 
-  <div class="mode-switch" role="group" aria-label="Work mode">
-    <button type="button" id="stockingModeBtn" class="active">Stocking</button>
-    <button type="button" id="sellingModeBtn">Selling</button>
-  </div>
-
-  <section class="business-panel" id="inventoryPanel">
-    <h2>Current Stock</h2>
-    <div class="business-grid">
-      <div class="business-stat"><small>Stock MRP Value</small><strong id="stockMrpValue">₹0.00</strong></div>
-      <div class="business-stat"><small>Stock DP Value</small><strong id="stockDpValue">₹0.00</strong></div>
-      <div class="business-stat"><small>Stock PV Value</small><strong id="stockPvValue">0</strong></div>
-    </div>
-    <div class="business-actions">
-      <button type="button" id="toggleStockListBtn">View stock list</button>
-      <button type="button" id="toggleStockHistoryBtn">Stock-in history</button>
-    </div>
-    <div class="business-list hidden" id="stockList"></div>
-    <div class="business-list hidden" id="stockHistoryList"></div>
-  </section>
-
-  <section class="business-panel hidden" id="salesPanel">
-    <h2>Sales</h2>
-    <div class="business-muted">Save a sale to deduct paid and free quantities from stock. Payments can be recorded now or later.</div>
-    <div class="business-fields">
-      <div class="business-field"><label for="receivedNow">Amount received now (optional)</label><input class="business-input" id="receivedNow" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="business-field"><label for="receivedMethod">Payment method</label><select class="business-input" id="receivedMethod"><option value="">Choose if received</option><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
-    </div>
-    <div class="business-actions"><button type="button" id="toggleSalesHistoryBtn">Sales history</button></div>
-    <div class="business-list hidden" id="salesHistoryList"></div>
-  </section>
-
-  <section class="business-panel">
-    <h2>Backup</h2>
-    <div class="business-muted">Export a backup before changing browsers or clearing browser data. Files stay on your device; nothing is synced.</div>
-    <div class="backup-actions"><button type="button" id="exportBackupBtn">Export backup</button><button type="button" id="importBackupBtn">Import backup</button></div>
-    <input id="backupFile" type="file" accept="application/json,.json">
-  </section>
-
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
     <div class="scan-frame"></div>
@@ -774,6 +736,38 @@ button:disabled {
     <div class="choices hidden" id="choices"></div>
     <div class="match-meta hidden" id="selectionNote"></div>
   </section>
+
+  <div class="mode-switch" role="group" aria-label="Work mode">
+    <button type="button" id="stockingModeBtn" class="active">Stocking</button>
+    <button type="button" id="sellingModeBtn">Selling</button>
+  </div>
+
+  <section class="business-panel" id="inventoryPanel">
+    <h2>Current Stock</h2>
+    <div class="business-grid">
+      <div class="business-stat"><small>Stock MRP Value</small><strong id="stockMrpValue">₹0.00</strong></div>
+      <div class="business-stat"><small>Stock DP Value</small><strong id="stockDpValue">₹0.00</strong></div>
+      <div class="business-stat"><small>Stock PV Value</small><strong id="stockPvValue">0</strong></div>
+    </div>
+    <div class="business-actions">
+      <button type="button" id="toggleStockListBtn">View stock list</button>
+      <button type="button" id="toggleStockHistoryBtn">Stock-in history</button>
+    </div>
+    <div class="business-list hidden" id="stockList"></div>
+    <div class="business-list hidden" id="stockHistoryList"></div>
+  </section>
+
+  <section class="business-panel hidden" id="salesPanel">
+    <h2>Sales</h2>
+    <div class="business-muted">Save a sale to deduct paid and free quantities from stock. Payments can be recorded now or later.</div>
+    <div class="business-fields">
+      <div class="business-field"><label for="receivedNow">Amount received now (optional)</label><input class="business-input" id="receivedNow" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="business-field"><label for="receivedMethod">Payment method</label><select class="business-input" id="receivedMethod"><option value="">Choose if received</option><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
+    </div>
+    <div class="business-actions"><button type="button" id="toggleSalesHistoryBtn">Sales history</button></div>
+    <div class="business-list hidden" id="salesHistoryList"></div>
+  </section>
+
 
   <!-- SHOPPING CART -->
 
@@ -868,6 +862,13 @@ button:disabled {
       <div class="saved-list" id="savedList"></div>
     </section>
 
+  </section>
+
+  <section class="business-panel">
+    <h2>Backup</h2>
+    <div class="business-muted">Export a backup before changing browsers or clearing browser data. Files stay on your device; nothing is synced.</div>
+    <div class="backup-actions"><button type="button" id="exportBackupBtn">Export backup</button><button type="button" id="importBackupBtn">Import backup</button></div>
+    <input id="backupFile" type="file" accept="application/json,.json">
   </section>
 
   <p class="foot">
