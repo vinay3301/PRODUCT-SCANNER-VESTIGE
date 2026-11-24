@@ -1211,7 +1211,7 @@ function saveCartToStorage() {
 
     localStorage.setItem(
       CART_STORAGE_KEY,
-      JSON.stringify({ cartName, cart })
+      JSON.stringify({ cartName, cart, cartMode })
     );
 
     return true;
@@ -1265,6 +1265,7 @@ function loadCartFromStorage() {
       cart = Array.isArray(data.cart)
         ? data.cart.map(normalizeCartItem).filter(Boolean)
         : [];
+      cartMode = data.cartMode==="selling"?"selling":(data.cartMode==="stocking"?"stocking":(cart.length?"selling":currentMode));
     }
 
   } catch (error) {
@@ -1276,7 +1277,7 @@ function loadCartFromStorage() {
   }
 
   $("cartName").value = cartName;
-  cartMode=cart.length?"selling":currentMode;
+  if(!cart.length)cartMode=currentMode;
 
   renderCart();
 }
@@ -1411,7 +1412,7 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
-  if(currentMode==="selling"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){
+  if(cartMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){
     alert("You cannot add more than the available stock for "+item.product.name+".");
     return;
   }
@@ -1594,6 +1595,7 @@ function calculateCartTotals(items) {
 
 function renderSavedCarts() {
 
+  if(!$("savedList")||!$("savedSection"))return;
   const list = $("savedList");
 
   list.innerHTML = "";
@@ -1698,9 +1700,9 @@ function legacyRenderCart() {
         <div class="cart-item-prices">
           <span>DP: ${escapeHtml(formatMoney(product.DP))}</span>
           <span>PV: ${escapeHtml(product.pv ?? "—")}</span>
-          ${currentMode==="selling" ? '<span style="color:var(--accent-soft)">Available: '+getStockQuantity(item.key)+'</span>' : ''}
+          ${cartMode==="selling" ? '<span style="color:var(--accent-soft)">Available: '+getStockQuantity(item.key)+'</span>' : ''}
         </div>
-        ${currentMode==="selling" ? '<div class="business-muted" style="margin-top:7px">Paid: '+paidQuantity+' · Free: '+freeQuantity+'</div><div class="business-muted" style="margin-top:5px">Free qty <input class="free-quantity" type="number" min="0" max="'+quantity+'" step="1" value="'+freeQuantity+'" data-free-key="'+escapeHtml(item.key)+'" aria-label="Free quantity"></div>' : ''}
+        ${cartMode==="selling" ? '<div class="business-muted" style="margin-top:7px">Paid: '+paidQuantity+' · Free: '+freeQuantity+'</div><div class="business-muted" style="margin-top:5px">Free qty <input class="free-quantity" type="number" min="0" max="'+quantity+'" step="1" value="'+freeQuantity+'" data-free-key="'+escapeHtml(item.key)+'" aria-label="Free quantity"></div>' : ''}
 
       </div>
 
@@ -1735,11 +1737,8 @@ function legacyRenderCart() {
   $("cartEmpty").classList.toggle("hidden", hasItems);
   $("cartSummary").classList.toggle("hidden", !hasItems);
 
-  $("saveCartBtn").disabled = !hasItems;
   $("postTransactionBtn").disabled = !hasItems || transactionBusy;
-  $("postTransactionBtn").textContent = currentMode==="stocking" ? "SAVE STOCK-IN" : (editingSaleId ? "SAVE SALE CHANGES" : "SAVE SALE");
-  $("exportCartBtn").disabled = !hasItems;
-  $("clearCartBtn").disabled = !hasItems;
+  $("postTransactionBtn").textContent = cartMode==="stocking" ? "SAVE STOCK-IN" : (editingSaleId ? "UPDATE SALE" : (saleType==="record" ? "CHECK OUT RECORD SALE" : "CHECK OUT ACTUAL SALE"));
 
   $("cartCount").textContent =
     totals.totalQuantity +
@@ -2681,7 +2680,9 @@ function selectedSaleDate(){
 }
 function saleTotal(items){return items.reduce((sum,item)=>sum+numericValue(item.product.DP)*Number(item.quantity),0);}
 function postSale(){
-  const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add products before saving the sale.");return;}
+  const items=cart.filter(i=>Number(i.quantity)>0);if(!items.length){alert("Add products before checking out the sale.");return;}
+  const shortages=getSaleStockShortages(items);
+  if(saleType==="actual"&&shortages.length){alert("Insufficient stock. "+shortages.map(x=>x.name+": required "+x.required+", available "+x.available+" (short by "+x.shortage+").").join(" "));return;}
   const oldSale=editingSaleId?businessData.sales.find(s=>s.id===editingSaleId):null;if(editingSaleId&&!oldSale){alert("Sale not found. Reload and try again.");return;}
   if(oldSale&&Date.now()-new Date(oldSale.createdAt).getTime()>7*86400000){alert("Sales can only be edited within 7 days of the original sale.");return;}
   const saleDate=selectedSaleDate();if(!saleDate){alert("Choose a valid date and time for this Record Sale.");return;}
