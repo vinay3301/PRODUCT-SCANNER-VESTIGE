@@ -2971,6 +2971,7 @@ function handleHistoryToggle(event){const share=event.target.closest("button[dat
 function closeHistoryShareDialog(){const dialog=$("historyShareDialog");if(dialog)dialog.hidden=true;}
 function historyRecordDate(record,type){const value=type==="sale"?(record.saleDate||record.createdAt):record.createdAt;const d=new Date(value);return Number.isNaN(d.getTime())?null:d;}
 function historyLocalDate(date){const d=new Date(date),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
+function historyPdfMoney(value){return "Rs. "+numericValue(value).toFixed(2);}
 function openHistoryShareDialog(type){
   const records=type==="sale"?(businessData.sales||[]):(businessData.stockIns||[]);
   const dates=records.map(r=>historyRecordDate(r,type)).filter(Boolean);
@@ -2996,14 +2997,14 @@ async function shareHistoryPdf(type,id=null,range=null){
   records.forEach((r,index)=>{
     const d=historyRecordDate(r,type),stamp=d?d.toLocaleString("en-IN"):"Date unavailable";
     line((index+1)+". "+(isSale?(r.customerName||"Sale"):(r.name||"Stock-in")),12,true,2);
-    line(stamp+(isSale?" · "+((r.saleType||"actual")==="record"?"Record Sale":"Actual Sale"):""),9,false,3,[90,100,93]);
+    line(stamp+(isSale?" | "+((r.saleType||"actual")==="record"?"Record Sale":"Actual Sale"):""),9,false,3,[90,100,93]);
     (r.items||[]).forEach(item=>{
       const name=item.product?.name||"Unknown product";
-      if(isSale)line("• "+name+" — Paid: "+Number(item.quantity||0)+", Free: "+Number(item.freeQuantity||0),9,false,2);
-      else line("• "+name+" — Quantity: "+Number(item.quantity||0)+", MRP: "+formatCartMoney(item.product?.MRP)+", DP: "+formatCartMoney(item.product?.DP)+", PV: "+Number(item.product?.pv||0),9,false,2);
+      if(isSale)line("- "+name+" - Paid: "+Number(item.quantity||0)+", Free: "+Number(item.freeQuantity||0),9,false,2);
+      else line("- "+name+" - Quantity: "+Number(item.quantity||0)+", MRP: "+historyPdfMoney(item.product?.MRP)+", DP: "+historyPdfMoney(item.product?.DP)+", PV: "+Number(item.product?.pv||0),9,false,2);
     });
-    if(isSale)line("Sale total: "+formatCartMoney(r.total),10,true,4);
-    else line("Stock-in totals — DP: "+formatCartMoney(r.totalDP)+" · MRP: "+formatCartMoney(r.totalMRP)+" · PV: "+Number(r.totalPV||0),10,true,4);
+    if(isSale)line("Sale total: "+historyPdfMoney(r.total),10,true,4);
+    else line("Stock-in totals - DP: "+historyPdfMoney(r.totalDP)+" | MRP: "+historyPdfMoney(r.totalMRP)+" | PV: "+Number(r.totalPV||0),10,true,4);
     y+=3;
   });
   const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(120);doc.text("Page "+p+" of "+pages,pw-right,ph-8,{align:"right"});}
