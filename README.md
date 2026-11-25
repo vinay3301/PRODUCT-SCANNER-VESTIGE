@@ -1,739 +1,402 @@
-# VESTIGE PRODUCT SCANNER
-## Complete Project Documentation – README
+# Product Scanner Vestige
 
-**Project Name:** Vestige Product Scanner  
-**Application Type:** Mobile-friendly web application / camera-based product scanner  
-**Primary Device:** Android smartphone  
-**Database:** Google Sheets  
-**Frontend Hosting:** GitHub Pages  
-**Backend API:** Cloudflare Workers  
-**OCR Technology:** Tesseract.js v5  
-**Internet Requirement:** Required  
-**Main Purpose:** Scan the printed name of a Vestige product using a mobile camera, identify the matching product from a database, display its MRP, DP and PV, and prepare customer shopping carts.
+A mobile-friendly, browser-based product scanner and dealer inventory/sales tool for Vestige products. The app combines camera-based OCR product identification with local stock management, stock-in records, Actual Sale and Record Sale workflows, transaction history, and JSON backup/restore.
+
+- **Live app:** https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/
+- **Source repository:** https://github.com/vinay3301/PRODUCT-SCANNER-VESTIGE
+- **Main application:** `index.html`
+- **Product data API:** `https://vestige-products-api.vinaykinnera3301.workers.dev/`
+
+> **Important data note:** Inventory, stock-in history, sales history, and the active cart are stored in the browser on the device/profile where the app is used. They are not automatically synchronized to Google Drive, a server, or another device. Export a backup regularly, especially before clearing browser data or changing devices.
 
 ---
 
-# 1. PROJECT OVERVIEW
+## Contents
 
-The Vestige Product Scanner is a browser-based application developed to make product identification and price checking easier.
+1. [What the app does](#what-the-app-does)
+2. [Application layout](#application-layout)
+3. [Complete button and control guide](#complete-button-and-control-guide)
+4. [Stock workflow](#stock-workflow)
+5. [Selling workflow](#selling-workflow)
+6. [Cart quantities, free products, and totals](#cart-quantities-free-products-and-totals)
+7. [History lists and scrolling](#history-lists-and-scrolling)
+8. [Backup and restore](#backup-and-restore)
+9. [Product scanning and matching](#product-scanning-and-matching)
+10. [Data storage and business rules](#data-storage-and-business-rules)
+11. [Technical architecture](#technical-architecture)
+12. [Testing and maintenance](#testing-and-maintenance)
+13. [Troubleshooting](#troubleshooting)
 
-Instead of manually searching through a product catalogue or Google Sheet, the user can point an Android phone's rear camera towards a product. The application captures the product name, extracts the text using Optical Character Recognition (OCR), compares the extracted text against the product database, and displays the most likely matching product.
+---
 
-After identifying a product, the user can:
+## What the app does
 
-- View its product name.
-- View MRP (Maximum Retail Price).
-- View DP (Distributor Price).
-- View PV (Point Value).
-- Add the product to a shopping cart.
-- Increase or decrease product quantities.
-- Calculate total DP and PV.
-- Save carts under customer or order names.
-- Load previously saved carts.
-- Export a cart as a PNG image.
-- Share the exported image using Android's native sharing interface when supported.
+The app has two connected purposes:
 
-The application is designed primarily for Android mobile devices and can be opened through a normal web browser. Users do not need to install a separate Android application.
+### Product identification
+- Reads a Vestige product label using the device camera.
+- Uses multi-pass OCR and image processing to recognize printed product names.
+- Compares OCR text with the product catalogue and presents likely matches.
+- Displays the selected product's **MRP**, **DP**, and **PV / Points**.
+- Adds the selected product to the current Stock-in Cart or Sale Cart, depending on the active workflow.
 
-# 2. PROJECT REQUIREMENTS AND DESIGN DECISIONS
+### Dealer stock and sales management
+- Records stock received and increases available inventory.
+- Shows current stock value using DP and PV.
+- Allows manual stock quantity adjustments.
+- Supports **Actual Sale** and **Record Sale**.
+- Calculates sale amount and PV, including free quantities.
+- Tracks stock-in history and sale history.
+- Exports and imports a complete JSON business-data backup.
 
-The project was designed around the following requirements:
+The interface is designed for mobile use but can also be opened in a desktop browser. Camera access requires a supported browser and a secure HTTPS page.
 
-1. **Mobile-first operation:** The scanner should work on an Android smartphone.
-2. **No barcode dependency:** Product identification should use printed product names rather than barcode scanning.
-3. **Central product database:** Product information should come from Google Sheets.
-4. **Public access:** Users should be able to open the scanner without signing in to Google.
-5. **Low-cost infrastructure:** Use free or free-tier hosting services wherever possible.
-6. **OCR-based identification:** Read product names directly from product packaging.
-7. **Intelligent matching:** Allow for common OCR recognition errors and display alternative matches.
-8. **Shopping cart:** Support multiple products and quantities.
-9. **Cart persistence:** Preserve active and saved carts in the same browser.
-10. **Image export:** Generate a shareable shopping cart image.
+---
 
-# 3. COMPLETE SYSTEM ARCHITECTURE
+## Application layout
 
-The project uses separate components for the user interface, database, API and hosting.
+The page is arranged in the following order:
 
-## 3.1 Architecture diagram
+1. Header, theme switch, and product API status.
+2. Camera preview and scanning frame.
+3. Camera controls and scan status.
+4. Selected product details and OCR match suggestions.
+5. **Stock / Selling** mode switch.
+6. The stock-management panel when Stock mode is active.
+7. The Stock-in Cart or Sale Cart.
+8. Sale controls and Sale History when Selling mode is active.
+9. Backup export/import panel.
 
-    ANDROID SMARTPHONE
-            |
-            v
-       WEB BROWSER
-            |
-            v
-     GITHUB PAGES WEBSITE
-            |
-            |---- HTML
-            |---- CSS
-            |---- JavaScript
-            |---- Camera API
-            |---- Tesseract.js OCR
-            |---- Image Processing
-            |---- Product Matching
-            |---- Shopping Cart
-            |
-            v
-      CLOUDFLARE WORKER API
-            |
-            v
-       PUBLISHED CSV DATA
-            |
-            v
-       GOOGLE SHEETS
-            |
-            v
-       PRODUCTS DATABASE
+The app starts in **Stock** mode. The same cart area is reused for stock-in and sales; its title, fields, and checkout action change with the active workflow.
 
-The application also uses the browser's local storage for active and saved shopping carts.
+---
 
-## 3.2 How the components communicate
+## Complete button and control guide
 
-**Frontend – GitHub Pages**
+This section describes the controls currently present in the application. Some controls are created dynamically by JavaScript when the relevant mode or result is displayed.
 
-GitHub Pages hosts the website. The browser downloads the HTML file and executes its CSS and JavaScript.
+### Header and theme
 
-**Database – Google Sheets**
-
-Google Sheets stores the product information. The product database is maintained in a sheet named `products`.
-
-**Data delivery – Cloudflare Worker**
-
-The Cloudflare Worker acts as an API between the website and the published Google Sheets CSV.
-
-It retrieves the published product data and provides it to the frontend in JSON format.
-
-**OCR – Tesseract.js**
-
-Tesseract.js processes the captured product image and extracts readable text.
-
-**Browser storage – LocalStorage**
-
-The browser stores active carts and saved carts locally on the user's device.
-
-**Image export – HTML Canvas**
-
-The application creates a PNG image of the shopping cart using the browser's Canvas API.
-
-# 4. TECHNOLOGIES USED
-
-| Technology | Purpose |
+| Button / indicator | What it does |
 |---|---|
-| HTML5 | Structure of the web application |
-| CSS3 | User interface, layout, colours and responsive design |
-| JavaScript | Application logic and interactions |
-| Tesseract.js v5 | Optical Character Recognition |
-| Google Sheets | Product database |
-| Published Google Sheets CSV | Public product data source |
-| Cloudflare Workers | Backend API and data delivery |
-| GitHub | Source code repository |
-| GitHub Pages | Website hosting |
-| Browser MediaDevices API | Access to the mobile camera |
-| HTML Canvas API | Image capture, processing and PNG generation |
-| Browser LocalStorage | Save active and saved carts |
-| Web Share API | Share cart images through supported devices and browsers |
-| JavaScript Fetch API | Retrieve product data from the Cloudflare API |
+| Sun / moon theme button | Switches between Light and Dark themes. Light is the default. The selected theme is saved in this browser using local storage, so it remains selected on the next visit in the same browser profile. |
+| API status badge (not a button) | Shows the product API connection/loading status. It changes when the product catalogue is being loaded or when an API error occurs. |
 
-No separate database server or conventional application server is required for the frontend.
+### Camera and product scanning
 
-# 5. GOOGLE SHEETS DATABASE
-
-## 5.1 Database location
-
-The project uses Google Sheets as its product database.
-
-Google Sheets:
-
-https://docs.google.com/spreadsheets/d/1Rv4fyxwKnA-TS77cFlt0YGdCELaVeaN3axpwjV0yFs8/edit
-
-The relevant worksheet/tab is named:
-
-`products`
-
-## 5.2 Database structure
-
-The database uses four main columns:
-
-| Column | Description |
+| Button | What it does |
 |---|---|
-| name | Full product name |
-| MRP | Maximum Retail Price |
-| DP | Distributor Price |
-| pv | Point Value |
-
-Example structure:
-
-    name                         MRP       DP       pv
-    -----------------------------------------------------
-    Assure Hair Conditioner      365       256      7.67
-    Assure Hair Oil               283       198      6.60
-    Assure Hair Shampoo           262       184      4.58
-
-The values above are illustrative examples of the database structure.
-
-## 5.3 Why Google Sheets was selected
-
-Google Sheets makes product database maintenance simple.
-
-The product list can be updated without changing the website's HTML code.
-
-For example:
-
-- Add a new product by adding a new row.
-- Update the MRP by editing the MRP cell.
-- Update the DP by editing the DP cell.
-- Update the PV by editing the PV cell.
-
-The application retrieves the product information through the API rather than requiring the user to manually upload a new database file.
-
-## 5.4 Publishing the spreadsheet as CSV
-
-The product worksheet is published in CSV format so that the backend can retrieve its data.
-
-Published CSV address:
-
-https://docs.google.com/spreadsheets/d/e/2PACX-1vQqxE08q7N5Wjv51m_mmoPusiqbdWXYvAMuuEUNh-M-0CCNkkQBU5a6tkyqAXCZ4aYhZn1IRWuiD7sG/pub?gid=1169149957&single=true&output=csv
-
-The CSV is a machine-readable version of the product worksheet.
-
-**Important:** The published CSV is publicly accessible. Only information intended for public access should be placed in this worksheet.
-
-# 6. CLOUDFLARE WORKER – BACKEND API
-
-## 6.1 Why a Cloudflare Worker was introduced
-
-Initially, the project used a Google Apps Script-based data access approach.
-
-However, the original approach created access and compatibility difficulties when the browser had multiple Google accounts signed in. It could work in Incognito mode while behaving differently in a normal browser session.
-
-The project required a public scanner that ordinary users could open without changing their Google account or signing in.
-
-To solve this, the product data delivery system was moved to a standalone Cloudflare Worker.
-
-## 6.2 Role of the Worker
-
-The Cloudflare Worker acts as an intermediary between Google Sheets and the website.
-
-Its general workflow is:
-
-1. Receive a request from the scanner website.
-2. Retrieve the published CSV data.
-3. Read and convert the product records into structured data.
-4. Return a JSON response.
-5. Allow the frontend to use the product records for matching and price display.
-
-The frontend does not need to access the Google Sheet through a user's Google login.
-
-## 6.3 API endpoint
-
-The application uses this API address:
-
-https://vestige-products-api.vinaykinnera3301.workers.dev/
-
-The HTML file contains this endpoint in its JavaScript configuration:
-
-    const API_URL =
-    "https://vestige-products-api.vinaykinnera3301.workers.dev/";
-
-The frontend requests the API using JavaScript's `fetch()` function.
-
-It checks that:
-
-- The HTTP response is successful.
-- The response is valid JSON.
-- The response contains `success: true`.
-- The response contains a `products` array.
-
-The application then loads the product records into memory.
-
-The API status is displayed at the top of the website.
-
-## 6.4 Important separation
-
-There are two separate deployment components:
-
-- The GitHub Pages website hosts the scanner interface.
-- The standalone Cloudflare Worker provides the product API.
-
-They have different responsibilities and should not be confused with each other.
-
-The existing scanner website and its original hosting configuration should not be deleted or replaced when maintaining the separate product API.
-
-# 7. GITHUB AND WEBSITE HOSTING
-
-## 7.1 GitHub repository
-
-The source code repository is:
-
-https://github.com/vinay3301/PRODUCT-SCANNER-VESTIGE
-
-GitHub stores the website files and provides version history.
-
-## 7.2 GitHub Pages website
-
-The public scanner website is:
-
-https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/
-
-GitHub Pages serves the frontend files over HTTPS.
-
-HTTPS is important because modern browsers generally require a secure context before allowing camera access.
-
-## 7.3 Website files
-
-The main application file is:
-
-`index.html`
-
-The HTML file contains:
-
-- Page structure.
-- CSS styling.
-- JavaScript application logic.
-- Camera handling.
-- OCR processing.
-- Product matching.
-- Shopping cart functions.
-- Cart export functions.
-
-The HTML also references a companion web app manifest:
-
-`manifest.webmanifest`
-
-The manifest is a separate file and should be kept available in the deployed website.
-
-Other companion files, such as any existing service-worker file, should be preserved if they are part of the deployed repository.
-
-The uploaded HTML alone does not contain the source code of the Cloudflare Worker or the contents of the manifest.
-
-## 7.4 Updating the website
-
-When the frontend needs to be updated:
-
-1. Open the GitHub repository.
-2. Open the repository's main branch.
-3. Locate `index.html`.
-4. Replace its contents with the updated HTML code.
-5. Commit the changes.
-6. Wait for GitHub Pages to publish the update.
-7. Open the public scanner website and test it.
-
-When only the HTML application is being updated, do not unnecessarily delete or replace the API Worker, manifest or other existing companion files.
-
-If an older version continues appearing, browser cache or service-worker caching may be responsible. Clearing the website's stored browser data can help confirm whether the latest deployment is being loaded.
-
-# 8. FRONTEND USER INTERFACE
-
-The interface uses a dark green colour scheme.
-
-It is designed to be readable on a mobile screen and includes the following main sections:
-
-1. Product Scanner header.
-2. API connection indicator.
-3. Camera preview.
-4. Scanning frame.
-5. Camera controls.
-6. Product information card.
-7. Product match suggestions.
-8. Shopping cart.
-9. Cart summary.
-10. Saved carts section.
-
-The layout uses responsive CSS so that the product information and cart controls adapt to smaller screens.
-
-# 9. CAMERA SCANNING SYSTEM
-
-## 9.1 Starting the camera
-
-The user taps the `Start camera` button.
-
-The application requests camera access through:
-
-`navigator.mediaDevices.getUserMedia()`
-
-The camera request prefers:
-
-- Rear-facing camera (`environment`).
-- Ideal video width of 1920 pixels.
-- Ideal video height of 1080 pixels.
-- No audio.
-
-The live camera stream is displayed in the webpage's video element.
-
-The browser may ask the user for camera permission the first time.
-
-## 9.2 Scanning frame
-
-A horizontal green scanning frame is displayed over the camera preview.
-
-The current HTML uses:
-
-- Left position: 6%.
-- Top position: 32%.
-- Width: 88%.
-- Height: 36%.
-
-The user should position the product name inside this frame.
-
-The OCR crop is calculated from the displayed camera area to focus recognition on the relevant region.
-
-The current crop uses approximately 88% of the visible width and 36% of the visible height.
-
-## 9.3 Automatic capture when the image becomes steady
-
-The application includes a frame-stability monitoring mechanism.
-
-It periodically samples the camera image.
-
-The process is:
-
-1. Capture a small image sample from the scanning region.
-2. Resize the sample to 32 × 40 pixels.
-3. Convert the sample into grayscale values.
-4. Compare the current sample with the previous sample.
-5. Calculate the average pixel difference.
-6. Treat the image as stable when the difference is below the configured threshold.
-7. Require three consecutive stable checks before automatically capturing.
-
-The monitoring interval is approximately 350 milliseconds.
-
-This is an image-movement detection method. It does not directly measure autofocus quality or guarantee that the product text is in focus.
-
-## 9.4 Manual capture
-
-The application also includes a `Capture now` button.
-
-The user can manually capture the product whenever necessary.
-
-This is useful when:
-
-- Automatic capture takes too long.
-- The camera is already steady.
-- The user wants to control the exact capture moment.
-
-## 9.5 Stop camera
-
-The `Stop` button stops the active camera tracks and releases the camera stream.
-
-The user can start the camera again when required.
-
-## 9.6 Scan another product
-
-After a product is selected, the user can tap:
-
-`Scan another product`
-
-This resets the previous product selection and allows the next scanning session to begin.
-
-# 10. OCR – OPTICAL CHARACTER RECOGNITION
-
-## 10.1 What is OCR?
-
-Optical Character Recognition is a technology that extracts text from an image.
-
-In this project, OCR reads product names printed on product packaging.
-
-The application uses:
-
-**Tesseract.js version 5**
-
-The library is loaded through the following CDN:
-
-https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js
-
-The OCR language configured in the application is English.
-
-The OCR engine runs inside the browser rather than requiring a separate OCR server.
-
-## 10.2 OCR initialization
-
-When the camera is started, the application checks whether Tesseract.js is available.
-
-It then creates an OCR worker:
-
-    Tesseract.createWorker("eng")
-
-The worker is reused for subsequent scans while the page remains active.
-
-## 10.3 High-resolution image preparation
-
-The application does not simply send the entire live camera frame directly to OCR.
-
-It first:
-
-1. Calculates the scanning crop.
-2. Extracts the relevant camera region.
-3. Creates a separate image using HTML Canvas.
-4. Upscales the image to improve the amount of text detail available to OCR.
-5. Limits the maximum image dimension to 2000 pixels.
-6. Uses high-quality image smoothing.
-
-The configured upscale factor is 1.7, subject to the maximum dimension limit.
-
-## 10.4 Image processing
-
-The application creates additional processed versions of the captured image.
-
-### Original image
-
-The original cropped image is used for OCR.
-
-### Grayscale image
-
-The colour image is converted into grayscale.
-
-The processing uses a contrast factor of 1.45 to make text differences more visible.
-
-### Binary image
-
-The grayscale image is converted into black and white.
-
-The application calculates an Otsu threshold using the image's grayscale histogram.
-
-Pixels are then classified as black or white based on that threshold.
-
-This creates a high-contrast version of the product text.
-
-## 10.5 Multi-pass OCR
-
-The application performs three OCR passes.
-
-| Pass | Image | Page segmentation mode |
+| **Start camera** | Requests camera permission and starts the camera, preferring the rear-facing camera on a phone. It also initializes the English OCR engine if needed and starts monitoring the scanning frame. |
+| **Capture now** | Takes a scan immediately instead of waiting for the automatic steady-frame capture. It is enabled while the camera is running and ready. |
+| **Stop camera** | Stops the active camera tracks and releases the camera. Start Camera can be used again when another scan is needed. |
+| **Scan another product** | Clears the previous selected-product result and prepares the scanner for another product. If the camera is still running, scanning can continue without restarting it. |
+| **＋ Add to Cart** | Adds the currently selected product to the active cart. In Stock mode it adds it to the Stock-in Cart; in Selling mode it adds it to the Sale Cart. Adding an already-present product increases its quantity. |
+| OCR match suggestion buttons | When multiple likely matches are found, each suggestion can be selected to choose that product. The selected product's name, MRP, DP, and PV are then displayed. |
+
+**Scanning tip:** Keep the printed product name inside the horizontal frame, hold the phone steady, use good lighting, and avoid glare. Automatic capture detects a steady image; it cannot guarantee that the text is in focus. Use **Capture now** if you want to choose the capture moment yourself.
+
+### Mode switch
+
+| Button | What it does |
+|---|---|
+| **Stock** | Opens the stock-management panel. The cart becomes the Stock-in Cart and its primary action becomes **SAVE STOCK-IN**. Stock List and Stock-in History are available in this mode. |
+| **Selling** | Opens the sales workflow. The cart becomes the Sale Cart, the Actual / Record selector and sale controls appear, and Sale History is shown below the checkout actions. |
+
+Switching modes does not intentionally discard a prepared cart. The app retains the cart's purpose when changing tabs, so a prepared sale cart remains a sale cart when returning to Selling.
+
+### Stock mode buttons
+
+| Button | What it does |
+|---|---|
+| **View stock list** | Opens or closes the current inventory list. Products are displayed in alphabetical order. Each row shows the product name, DP, PV, current quantity, and quantity controls. |
+| **Stock-in history** | Opens or closes the list of saved stock-in transactions. The newest stock-in appears first. Select a record summary to expand or collapse its product details. |
+| **CLEAR STOCK** | After confirmation, sets every inventory quantity to zero. It keeps product entries and does **not** delete stock-in history or sale history. This action cannot be undone unless a backup is available. |
+| **−** beside a Stock List product | Decreases that product's available stock by one. Quantity cannot go below zero. |
+| **＋** beside a Stock List product | Increases that product's available stock by one. |
+| **− / ＋** in the Stock-in Cart | Decreases or increases the quantity being prepared for the next stock-in. Decreasing to zero removes the product from the cart. |
+| **SAVE STOCK-IN** | Saves the prepared stock-in transaction. The entered quantities are added to current inventory and a stock-in history record is created. The cart is then cleared. |
+
+The optional name field in Stock mode is a stock-in reference/note. If it is left blank, the history record is labelled **Stock-in**.
+
+### Selling mode buttons and controls
+
+| Button / control | What it does |
+|---|---|
+| **Actual** | Selects Actual Sale mode. This is the default sale type. Checkout deducts the full sold quantity from inventory, including free units. Checkout is blocked if available stock is insufficient. |
+| **Record** | Selects Record Sale mode. It records a sale without deducting inventory. A Record Sale date and time field is displayed so an earlier or specific transaction time can be entered. |
+| **Select product from available stock** | Dropdown containing products with available stock. Choose a product to add it directly to the Sale Cart. |
+| **ADD** | Adds the selected dropdown product to the Sale Cart. It is unavailable for products with no stock. Actual Sale quantity is limited by available stock. |
+| **− / ＋** in the Sale Cart | Decreases or increases the total quantity for a cart product. In Actual Sale mode, adding quantity is limited by available stock. |
+| **Free qty** input | Sets how many units of that cart line are free. Free quantity cannot exceed total quantity. Paid quantity is total quantity minus free quantity. |
+| **CHECK OUT ACTUAL SALE** | Saves an Actual Sale after validating stock and quantities. The full quantity (paid plus free) is deducted from stock. |
+| **CHECK OUT RECORD SALE** | Saves a Record Sale using the selected record date/time. Inventory is not changed. |
+| **UPDATE SALE** | Appears when editing an existing sale. Saves the edited transaction and recalculates the required stock adjustment according to the old and new sale types and quantities. |
+| **CLEAR SALE CART** | After confirmation, clears the current sale cart and cancels an in-progress sale edit. It does not change stock or delete saved sale history. |
+| **Edit / Return** in Sale History | Loads that saved sale into the Sale Cart for editing. Sales can be edited within seven days of the original record creation. After reviewing the quantities, type, and date/time, use the checkout/update action to save the changes. Changing between Actual and Record during an edit may change stock and requires confirmation. |
+| **Delete** in Sale History | Permanently deletes the selected sale after confirmation. Deleting an Actual Sale returns its deducted quantities (including free units) to inventory. Deleting a Record Sale does not change stock. |
+
+The customer name field is optional. If it is blank, the Sale History summary uses **Sale** as the display name.
+
+### Cart controls shared by Stock-in and Selling
+
+| Control | What it does |
+|---|---|
+| Product quantity **−** | Reduces the selected cart line by one. A line is removed when its quantity reaches zero. |
+| Product quantity **＋** | Adds one to the selected cart line. Actual Sale cannot exceed available stock. |
+| **Cart / Customer name** field | In Stock mode, enter an optional stock-in reference. In Selling mode, enter an optional customer name. |
+| Cart summary | Shows product types, total quantity, total DP (or sale amount in Selling mode), and total PV. |
+| Cart item count | Shows the total units in the cart, not just the number of different product types. |
+
+### Backup buttons
+
+| Button | What it does |
+|---|---|
+| **Export backup** | Downloads a JSON backup file to the device. The backup contains the dealer business data, inventory, stock-in history, sales history, and active cart data. Keep the downloaded file somewhere safe. |
+| **Import backup** | Opens the device's file picker. Choose a valid Product Scanner Vestige JSON backup. The app validates the file and asks for confirmation before replacing the current browser's business data and active cart. |
+
+**Important:** Import replaces the current browser's inventory, stock-in history, sales history, and active cart with the contents of the selected backup. Export a fresh backup before importing if the current data matters.
+
+---
+
+## Stock workflow
+
+1. Open the app and select **Stock**.
+2. Scan a product using **Start camera** and either wait for a steady-frame capture or tap **Capture now**.
+3. Confirm the displayed product and its MRP, DP, and PV.
+4. Tap **＋ Add to Cart**. Repeat for each product being received.
+5. In the Stock-in Cart, adjust each quantity with **− / ＋**.
+6. Optionally enter a stock-in reference in the name field.
+7. Review product types, total quantity, total DP, and total PV.
+8. Tap **SAVE STOCK-IN**.
+9. Open **View stock list** to confirm the available quantities, or **Stock-in history** to review the saved transaction.
+
+You can also increase or decrease existing inventory directly from the Stock List. These manual adjustments update current stock but do not create a stock-in history transaction.
+
+### Current stock valuation
+
+The Current Stock panel displays:
+- **Stock DP Value:** sum of each product's DP multiplied by its available quantity.
+- **Stock PV Value:** sum of each product's PV multiplied by its available quantity.
+
+The current panel does not show a stock MRP total.
+
+---
+
+## Selling workflow
+
+1. Select **Selling**.
+2. Choose **Actual** or **Record**.
+3. Add products by either:
+   - Scanning the product and tapping **＋ Add to Cart**, or
+   - Selecting a stocked product from the dropdown and tapping **ADD**.
+4. Adjust quantities using **− / ＋**.
+5. For free units, enter the free quantity in the **Free qty** field.
+6. Optionally enter the customer name.
+7. For Record Sale, choose the transaction date and time.
+8. Review the sale amount, total quantity, product types, and PV.
+9. Tap the appropriate checkout button.
+
+### Actual Sale versus Record Sale
+
+| Behaviour | Actual Sale | Record Sale |
 |---|---|---|
-| Pass 1 | Original high-resolution image | 11 |
-| Pass 2 | Grayscale image | 6 |
-| Pass 3 | Black-and-white image | 7 |
+| Checks available stock | Yes | No stock deduction is required |
+| Deducts inventory | Yes | No |
+| Free units included in stock deduction | Yes | Not applicable to inventory |
+| Uses a sale date/time | Original/current transaction time | User-selectable date and time |
+| Included in daily/monthly sales totals | Yes | Yes |
 
-Each pass uses a different Tesseract page segmentation mode.
+**Actual Sale safety:** Checkout is blocked if the requested total quantity is greater than available stock. Free units are still physical units and are included in the stock deduction.
 
-The purpose is to give OCR multiple opportunities to recognize the same product name under different image-processing conditions.
+**Record Sale purpose:** Use this mode to record a transaction that should appear in sales history and sales totals without changing current inventory. It is not a stock-out operation.
 
-The recognized text from all successful passes is collected.
+### Daily and monthly sales overview
 
-## 10.6 Combining OCR results
+Selling mode displays:
+- **Total sale today**
+- **Total sale this month**
 
-The OCR results are combined into one text string.
+Both Actual Sales and Record Sales contribute to these totals, using the saved sale date.
 
-The application:
+---
 
-1. Splits the OCR results into lines.
-2. Removes leading and trailing spaces.
-3. Ignores very short lines.
-4. Normalizes the text.
-5. Removes duplicate normalized lines.
-6. Combines the unique lines.
+## Cart quantities, free products, and totals
 
-The resulting text is passed to the product matching system.
+The cart quantity represents the **total units**, including free units.
 
-# 11. PRODUCT MATCHING ENGINE
+For example, if a customer receives three units and one is free:
 
-## 11.1 Purpose
+- Total quantity: 3
+- Free quantity: 1
+- Paid quantity: 2
+- Sale amount: DP × 2
+- Actual Sale stock deduction: 3 units
 
-OCR does not always recognize every character correctly.
+The PV sale total is calculated from paid quantity. The inventory deduction for Actual Sale uses paid plus free quantity.
 
-For example, the product name may be read with:
+This distinction prevents free products from being charged while ensuring the physical units are deducted from stock.
 
-- Missing letters.
-- Incorrect letters.
-- Extra characters.
-- Inconsistent spaces.
-- Different punctuation.
-- Partial words.
+---
 
-Therefore, exact string matching is not sufficient.
+## History lists and scrolling
 
-The application uses a token-based similarity matching system.
+The interface keeps long lists inside compact scrollable areas rather than allowing them to make the page excessively long.
 
-## 11.2 Text normalization
+| Area | Initial visible limit | Behaviour |
+|---|---:|---|
+| Stock List | 5 products | Additional products scroll inside the list. Products are alphabetical. |
+| Stock-in History | 5 records | Additional records scroll inside the list. Newest first. |
+| Sale Cart | 10 product rows | Additional cart rows scroll inside the cart area. |
+| Sale History | 5 records | Additional records scroll inside the history area. Newest first. |
 
-Before comparing names, the application normalizes the text.
+### Expandable history records
 
-The normalization process:
+Stock-in History and Sale History initially show compact summaries. Tap a record's summary row to expand its product details; tap it again to collapse the details. Each record can be expanded independently.
 
-1. Converts text to lowercase.
-2. Normalizes Unicode characters.
-3. Removes accent marks.
-4. Replaces punctuation and special characters with spaces.
-5. Removes repeated spaces.
-6. Splits the text into individual words.
+**Stock-in summary** includes the reference/name, date and time, product-type count, total quantity, DP, MRP, and PV. Expanded details list products alphabetically with quantities and product values.
 
-This allows text to be compared without depending on capitalization or punctuation.
+**Sale summary** includes the customer/name, date and time, sale type, product-type count, total quantity, amount sold, and total PV. Expanded details show each product's paid and free quantities. Sale history also retains the **Edit / Return** and **Delete** actions where applicable.
 
-## 11.3 Word-based comparison
+The history panels use natural scroll chaining: when the inner list reaches its top or bottom, continued scrolling can move the page rather than trapping the scroll inside the panel.
 
-The application compares individual words from the OCR result with individual words from each product name.
+---
 
-It does not require the words to appear in exactly the same order.
+## Backup and restore
 
-Each database product is evaluated against the OCR text.
+Business information is saved in the browser's local storage. The app does not provide account-based cloud synchronization.
 
-## 11.4 Handling OCR spelling errors
+### Recommended backup routine
 
-The matching engine uses two main methods.
+1. Open the **Backup** section.
+2. Tap **Export backup**.
+3. Confirm that the JSON file has downloaded.
+4. Store a copy somewhere safe, preferably outside the phone/computer as well.
+5. Export another backup after important stock or sales changes.
 
-**A. Partial word matching**
+### Restore on the same or another device
 
-If one word contains another and the shorter word has at least four characters, the algorithm can assign a partial similarity score.
+1. Open the app on the target device/browser.
+2. Open the **Backup** section.
+3. Tap **Import backup**.
+4. Select the exported JSON file.
+5. Read the replacement warning and confirm only if you intend to replace the current browser data.
 
-**B. Levenshtein distance**
+The backup format currently identifies the app as `Product Scanner Vestige` and uses backup version `1`. Invalid or unsupported files are rejected.
 
-Levenshtein distance measures how many character insertions, deletions or substitutions are needed to change one word into another.
+---
 
-This helps the application recognize certain OCR spelling errors.
+## Product scanning and matching
 
-For short words, the matching engine applies stricter restrictions to avoid excessive false matches.
+### Product catalogue loading
 
-## 11.5 Weighted matching
+The frontend requests the product catalogue from the configured Cloudflare product API. The API response is expected to be JSON with:
+- `success: true`
+- A `products` array
 
-The application gives longer product-name words more weight.
+The frontend validates the response and loads usable product records. The API request has a 15-second timeout. The API badge and status text provide loading or error feedback.
 
-The weight of a product-name token is its length, capped at 12.
+### OCR process
 
-For each product-name word, the algorithm finds the best similarity against the OCR words.
+The scanner uses Tesseract.js v5 with English recognition in the browser.
 
-It then calculates:
+At a high level, the scan process:
+1. Crops the camera image around the scanning frame.
+2. Creates a high-resolution image for recognition.
+3. Produces original, grayscale/contrast-enhanced, and black-and-white image variants.
+4. Runs multiple OCR passes using different page-segmentation settings.
+5. Combines recognized lines and removes duplicate/short results.
+6. Sends the combined text to the product matching engine.
 
-- Total weighted similarity.
-- Number of matched words.
-- Word coverage.
+### Product matching
 
-A coverage bonus is added when enough of the product-name words are recognized.
+The matching engine normalizes text and compares words rather than requiring an exact full-string match. It tolerates some OCR spelling errors using token similarity and Levenshtein distance. Candidate products are ranked and up to five suggestions can be shown.
 
-The final score is limited to a maximum of 100%.
+The displayed match score is a text-similarity score, **not** a statistical probability. Check the product name and displayed prices before adding a product to a business transaction.
 
-**Important:** The displayed match score is an algorithmic similarity score, not a statistical probability that the product is correct.
+---
 
-## 11.6 Top-five results
+## Data storage and business rules
 
-After calculating scores for the database products:
+- Inventory, stock-in records, sales records, and the active cart are stored locally in the browser.
+- Data is scoped to the browser profile and website origin. A different browser, profile, or device has separate local data unless a backup is imported.
+- Clearing site data, browser storage, or using a private/incognito session can make locally stored business data unavailable.
+- Product catalogue data is fetched from the separate product API; dealer inventory and transactions are not uploaded to that API by the normal business workflow.
+- Manual stock changes update inventory quantities but do not create stock-in records.
+- CLEAR STOCK sets quantities to zero but retains product entries and transaction histories.
+- Actual Sale deducts paid and free units from stock.
+- Record Sale records the sale without changing stock.
+- Deleting an Actual Sale restores the deducted units; deleting a Record Sale leaves stock unchanged.
+- Sale edits are limited to seven days from the original sale creation time.
+- Payment logging, refunds, customer phone-number management, and account-based multi-device synchronization are not part of the current visible workflow.
 
-1. Products are sorted by their similarity score.
-2. Coverage is used as a secondary sorting factor.
-3. The five highest-ranked matches are returned.
+---
 
-The user can see the candidate product names and their match scores.
+## Technical architecture
 
-This makes it possible to distinguish between similar products.
+| Component | Responsibility |
+|---|---|
+| `index.html` | Main frontend markup, styles, application logic, camera workflow, OCR integration, matching, inventory, sales, history, and backup/restore. |
+| GitHub Pages | Hosts the public frontend at the live app URL. |
+| Cloudflare product API | Delivers the product catalogue to the frontend. This is separate from the browser's local dealer business data. |
+| Tesseract.js v5 | Performs English OCR in the browser. |
+| Browser MediaDevices API | Requests and controls camera access. |
+| HTML Canvas API | Crops/resizes/processes camera images and creates image data used by OCR. |
+| Browser LocalStorage | Persists local inventory, transaction history, active cart, and theme preference. |
+| GitHub Actions | Runs repository regression checks on applicable changes. |
+| Wrangler configuration / Cloudflare build | Supports the repository's configured Cloudflare static-assets build workflow; it is distinct from the separate product catalogue API. |
 
-## 11.7 Minimum match threshold
+### Main URLs
 
-The application uses:
+- Website: https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/
+- Repository: https://github.com/vinay3301/PRODUCT-SCANNER-VESTIGE
+- Product API: https://vestige-products-api.vinaykinnera3301.workers.dev/
 
-`MIN_MATCH_THRESHOLD = 0.20`
+The product API and the frontend hosting/deployment configuration have separate responsibilities. A frontend documentation or UI change does not require changing the product API Worker.
 
-If the best match is below 20%, the application displays:
+---
 
-`No clear product match`
+## Testing and maintenance
 
-The user can then improve the camera position, lighting or product visibility and scan again.
+The repository includes automated regression checks for application business logic and important UI structure/behaviour. Recent work has included regression coverage for:
 
-## 11.8 Automatic product selection
+- Actual Sale and Record Sale stock behaviour.
+- Free-quantity calculations and inventory deduction.
+- Sale editing, type conversion, deletion, and date-based totals.
+- Backup validation, import, migration, and storage-write rollback.
+- Cart and list viewport limits.
+- Alphabetical stock ordering and newest-first history ordering.
+- Expandable history summaries and scroll chaining.
+- Required UI elements and event-listener targets.
 
-The application uses:
+Run the repository's configured GitHub Actions workflows when changing application code. A passing automated suite does not replace testing the live app with representative business data on the intended phone/browser.
 
-`AUTO_MATCH_THRESHOLD = 0.62`
+### Safe maintenance practices
 
-This means the top match must reach at least 62% before automatic selection is scheduled.
+1. Export a JSON backup before testing changes that could affect business data.
+2. Make code changes on a feature branch and review them through a pull request.
+3. Do not replace or remove the product API Worker when changing only the frontend.
+4. Do not commit real customer or dealer transaction data, exported backups, API secrets, or private credentials.
+5. Test Stock, Selling, Actual Sale, Record Sale, history actions, and backup restore after relevant changes.
 
-The delay is:
+---
 
-`AUTO_FINALIZE_DELAY_MS =
+## Troubleshooting
 
-# 12. DEALER STOCK MANAGEMENT
+| Problem | Checks |
+|---|---|
+| Product API stays on Connecting or reports an error | Check internet access and the API status text. The product API request has a 15-second timeout. |
+| Camera does not start | Open the HTTPS website, allow camera permission, check that another app is not using the camera, and use a browser that supports camera access. |
+| OCR does not recognize the product | Improve lighting, reduce glare, move closer, keep the product name inside the frame, hold steady, or use **Capture now**. |
+| Wrong product is selected | Review the candidate suggestions and manually choose the correct product before adding it to the cart. |
+| Actual Sale checkout is blocked | Check the available quantity in Stock List. Actual Sale cannot deduct more units than are available. |
+| Business data is missing on another device/browser | Local data is not synchronized. Import a previously exported JSON backup. |
+| A history record appears compact | Tap its summary row to expand or collapse the product details. |
+| Old page behaviour remains visible after a deployment | Reload the page and check the deployed commit/build. Browser caching may temporarily show an older frontend. |
 
-The dealer inventory and sales features run entirely in the browser. Each dealer's inventory is stored in that dealer's own browser storage. There is no dealer account, shared stock database, or automatic synchronization between devices or browsers.
+---
 
-## 12.1 Stocking mode
+## Current application scope
 
-Use **Stocking** when products are received into the dealer's shop.
+This README documents the current application represented by the repository's `main` branch and its current `index.html` UI. The exact controls and workflows may change as future pull requests are merged.
 
-1. Scan products or add them to the current cart.
-2. Increase the quantity for each product.
-3. Tap **SAVE STOCK-IN** to post the receipt.
-4. The saved quantities are added to the available inventory.
-
-Each stock-in creates a separate dated history record. The stock summary displays only total stock DP value and total stock PV value. Stock-in history retains the item quantities and price/point values captured at the time of receipt. Stock-in history retains the item quantities and price/point values captured at the time of receipt.
-
-## 12.2 Current stock
-
-The stock list displays products with a positive available quantity. The scanner uses these balances when building a sale. Stock values are calculated from the product prices stored with each inventory item.
-
-# 13. SELLING MODE
-
-Use **Selling** to prepare and save customer sales. The customer/cart name is optional. The sale cart is the single place to prepare, save and edit a sale.
-
-The Selling area includes:
-
-- **Actual Sale** and **Record Sale** modes. Actual Sale is selected by default whenever Selling mode is opened.
-- A product selector populated from products with positive available stock, with the selector and **Add Selected** button on the same row.
-- Total sale today and total sale this month, calculated from all saved sales (both sale types) using each sale's recorded date and the device's local calendar.
-- Sale History with the sale type, date, product quantities, total quantity, amount sold and total PV.
-
-## 13.1 Actual Sale
-
-An Actual Sale deducts stock when it is saved.
-
-- The paid quantity is charged at the product DP.
-- Free quantity is included in total quantity, but does not contribute to the sale amount or PV.
-- Both paid and free units are deducted from inventory.
-- Available stock is checked before the sale is saved.
-
-## 13.2 Record Sale
-
-A Record Sale saves the transaction for reporting and history without changing inventory.
-
-- Choose the sale date and time manually before saving.
-- The paid quantity contributes to amount sold and PV.
-- Free quantity is included in total quantity but contributes neither sale amount nor PV.
-- Neither paid nor free units are deducted from stock.
-
-Both Actual Sale and Record Sale contribute to the daily and monthly sale totals. If a sale is deleted or edited, the totals are recalculated from the remaining saved records and their sale dates.
-
-## 13.3 Editing, returns and deleting sales
-
-A saved sale can be edited within seven days of its original creation time. Choose **Edit / Return** in Sale History. The sale is loaded into the existing cart; make the changes and save.
-
-Inventory adjustments depend on the original and new sale types:
-
-- Editing an Actual Sale adjusts stock by the difference between the old and new quantities.
-- Editing a Record Sale does not change stock.
-- Changing Actual Sale to Record Sale returns the old sale's deducted quantities to stock.
-- Changing Record Sale to Actual Sale deducts the new sale quantities from stock, subject to availability.
-- Deleting an Actual Sale returns all paid and free units to stock.
-- Deleting a Record Sale does not change stock.
-
-The app retains a revision record when a sale is edited. Deleting a sale removes that sale from Sale History and recalculates the daily and monthly totals.
-
-## 13.4 Free products
-
-The cart supports free quantities for promotions such as buying two products and giving one additional unit free. Total quantity includes paid and free units. Free units are excluded from the sale DP amount and PV. In Actual Sale, all units reduce inventory; in Record Sale, none reduce inventory.
-
-## 13.5 Payment tracking
-
-Payment tracking is not part of the current application workflow. There are no payment methods, amount-received fields, outstanding balances, payment ledgers or refund ledgers.
-
-# 14. LOCAL DATA AND BACKUPS
-
-The app stores the following information in the current browser:
-
-- Active cart and saved carts.
-- Current inventory quantities.
-- Stock-in history.
-- Sales history, sale types, sale dates and sale revisions.
-
-This storage is local to the browser profile. Data is not automatically copied to another browser, phone, or computer. Clearing browser/site data may permanently remove it.
-
-Use **Export backup** to download a JSON backup to the device. It includes inventory, stock-in history, sales history, sale types and dates, active cart and saved carts. Use **Import backup** in the destination browser to restore it. Import validates the backup and asks for confirmation before replacing the data currently stored in that browser.
-
-Older version 1 backups remain supported. On loading or importing older sale records, the app treats them as **Actual Sale** records because the previous version always deducted stock when a sale was saved. Their original sale timestamps are used as their sale dates. Obsolete payment and refund fields are ignored and removed from the normalized business data; inventory, stock-in records, sale items and sale totals are preserved.
-
-**Important:** Keep backup files somewhere safe. Export a fresh backup regularly and before clearing browser data, changing devices, or changing browsers.
-
-# 15. IMPORTANT OPERATING NOTES
-
-1. Use Stocking mode for incoming products and Selling mode for customer sales or records.
-2. Actual Sale deducts paid and free quantities from stock; Record Sale does not change stock.
-3. Free quantities count towards total quantity but not sale amount or PV.
-4. Record Sale uses the manually selected sale date and time. Daily/monthly totals include both sale types.
-5. Sale edits are restricted to seven days after the original sale creation time.
-6. The inventory is private to the local browser profile, not protected by a dealer login. Anyone using the same browser profile can access its stored data.
+**Always verify product identity, quantities, free units, and totals before saving a stock-in or sale transaction.**
