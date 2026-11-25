@@ -552,6 +552,8 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
         this.elements.set(id, {
           textContent: "",
           attrs: {},
+          showModal() { this.modalOpen = true; },
+          close() { this.modalOpen = false; },
           classList: {
             contains: value => classes.has(value),
             add: value => classes.add(value),
@@ -577,6 +579,7 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   cameraContext.stream = { getTracks: () => [{ readyState: "live" }] };
   cameraContext.handleCameraScannerToggle();
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), false);
+  assert.equal(cameraContext.$("cameraStopConfirmDialog").modalOpen, true);
   cameraContext.confirmCameraScannerClose();
   assert.equal(cameraContext.stopCount, 1);
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
