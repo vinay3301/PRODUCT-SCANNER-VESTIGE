@@ -522,6 +522,38 @@ test("Stock-in history sorts newest first and products alphabetically", () => {
   assert.match(businessSource, /\(r\.items\|\|\[\]\)\]\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
 
+test("Manual product search filters all typed words, prioritizes exact matches, and sorts alphabetically", () => {
+  assert.ok(html.indexOf('class="manual-search-panel"') < html.indexOf('class="camera-wrap"'));
+  assert.match(html, /grid-template-columns:minmax\(0,4fr\) minmax\(70px,1fr\)/);
+  assert.match(html, /addEventListener\("input", renderManualProductSearch\)/);
+  assert.match(html, /limitListTo\(results, 5, "contain"\)/);
+  assert.match(html, /overscroll-behavior:contain/);
+
+  const start = html.indexOf("function findManualProductMatches(query)");
+  const end = html.indexOf("\\nfunction renderManualProductSearch()", start);
+  assert.ok(start >= 0 && end > start, "Could not locate manual product matching function");
+  const context = {
+    products: [
+      { name: "Assure Enchant Body Talk" },
+      { name: "Assure Enchant Deo" },
+      { name: "Assure Enchant" },
+      { name: "Assure Enchant Face Wash" },
+      { name: "Assure Body Lotion" }
+    ],
+    normalizeText: value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\\s+/g, " ").trim()
+  };
+  vm.runInNewContext(html.slice(start, end), context);
+  const names = JSON.parse(JSON.stringify(
+    context.findManualProductMatches("assure enchant").map(item => item.name)
+  ));
+  assert.deepEqual(names, [
+    "Assure Enchant",
+    "Assure Enchant Body Talk",
+    "Assure Enchant Deo",
+    "Assure Enchant Face Wash"
+  ]);
+});
+
 (async () => {
   for (const result of results) {
     console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
