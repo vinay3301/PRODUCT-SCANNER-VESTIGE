@@ -522,6 +522,33 @@ test("Stock-in history sorts newest first and products alphabetically", () => {
   assert.match(businessSource, /\(r\.items\|\|\[\]\)\]\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
 
+test("Manual search stock status reflects dealer inventory quantities", () => {
+  assert.match(html, /manual-search-stock\.in-stock/);
+  assert.match(html, /manual-search-stock\.out-of-stock/);
+  assert.match(html, /manual-search-result-content/);
+  assert.match(html, /name\.textContent = product\.name/);
+  assert.match(html, /stock\.textContent = stockStatus/);
+
+  const start = html.indexOf("function getManualProductStockStatus(product)");
+  const end = html.indexOf("\nfunction renderManualProductSearch()", start);
+  assert.ok(start >= 0 && end > start, "Could not locate manual search stock-status helper");
+  const context = {
+    businessData: {
+      inventory: {
+        "assure enchant": { quantity: 4 },
+        "assure aloe gel": { quantity: 0 },
+        "assure face wash": { quantity: -2 }
+      }
+    },
+    normalizeText: value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\\s+/g, " ").trim()
+  };
+  vm.runInNewContext(html.slice(start, end), context);
+  assert.equal(context.getManualProductStockStatus({ name: "Assure Enchant" }), "In-stock");
+  assert.equal(context.getManualProductStockStatus({ name: "Assure Aloe Gel" }), "Out of stock");
+  assert.equal(context.getManualProductStockStatus({ name: "Assure Face Wash" }), "Out of stock");
+  assert.equal(context.getManualProductStockStatus({ name: "Unknown Product" }), "Out of stock");
+});
+
 test("Manual product search matches word prefixes only, prioritizes exact names, and sorts alphabetically", () => {
   assert.ok(html.indexOf('class="manual-search-panel"') < html.indexOf('class="camera-scanner-area hidden"'));
   assert.match(html, /grid-template-columns:minmax\(0,4fr\) minmax\(0,1fr\)/);
