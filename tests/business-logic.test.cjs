@@ -522,35 +522,54 @@ test("Stock-in history sorts newest first and products alphabetically", () => {
   assert.match(businessSource, /\(r\.items\|\|\[\]\)\]\.sort\(\(a,b\)=>String\(a\?\.product\?\.name/);
 });
 
-test("Manual product search filters all typed words, prioritizes exact matches, and sorts alphabetically", () => {
-  assert.ok(html.indexOf('class="manual-search-panel"') < html.indexOf('class="camera-wrap"'));
+test("Manual product search matches word prefixes only, prioritizes exact names, and sorts alphabetically", () => {
+  assert.ok(html.indexOf('class="manual-search-panel"') < html.indexOf('class="camera-scanner-area hidden"'));
   assert.match(html, /grid-template-columns:minmax\(0,4fr\) minmax\(0,1fr\)/);
   assert.match(html, /addEventListener\("input", renderManualProductSearch\)/);
+  assert.match(html, /id="showCameraScannerBtn"[^>]*>[\s\S]*?SCAN/);
+  assert.match(html, /id="cameraScannerArea" class="camera-scanner-area hidden"/);
+  assert.match(html, /cameraScannerArea"\)\.classList\.remove\("hidden"\)/);
+  assert.match(html, /selectManualProduct\(product\)/);
+  assert.doesNotMatch(html, /manualProductSelectBtn|confirmManualProductSelection/);
   assert.match(html, /limitListTo\(results, 5, "contain"\)/);
   assert.match(html, /overscroll-behavior:contain/);
+  assert.match(html, /let currentMode = "selling"/);
+  assert.match(html, /setBusinessMode\(cart.length \? cartMode : "selling"\)/);
+  assert.match(html, /id="sellingModeBtn" class="active"/);
 
   const start = html.indexOf("function findManualProductMatches(query)");
   const end = html.indexOf("\nfunction renderManualProductSearch()", start);
   assert.ok(start >= 0 && end > start, "Could not locate manual product matching function");
   const context = {
     products: [
-      { name: "Assure Enchant Body Talk" },
-      { name: "Assure Enchant Deo" },
+      { name: "Aloe Vera Vestige Gel" },
+      { name: "Vestige Aloe Vera Gel" },
+      { name: "Best Vestige Shampoo" },
+      { name: "Vespa Body Lotion" },
       { name: "Assure Enchant" },
-      { name: "Assure Enchant Face Wash" },
-      { name: "Assure Body Lotion" }
+      { name: "Vestige Face Wash" },
+      { name: "Ves" }
     ],
     normalizeText: value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim()
   };
   vm.runInNewContext(html.slice(start, end), context);
   const names = JSON.parse(JSON.stringify(
-    context.findManualProductMatches("assure enchant").map(item => item.name)
+    context.findManualProductMatches("ves").map(item => item.name)
   ));
   assert.deepEqual(names, [
-    "Assure Enchant",
-    "Assure Enchant Body Talk",
-    "Assure Enchant Deo",
-    "Assure Enchant Face Wash"
+    "Ves",
+    "Aloe Vera Vestige Gel",
+    "Best Vestige Shampoo",
+    "Vespa Body Lotion",
+    "Vestige Aloe Vera Gel",
+    "Vestige Face Wash"
+  ]);
+  const multiWordNames = JSON.parse(JSON.stringify(
+    context.findManualProductMatches("ves gel").map(item => item.name)
+  ));
+  assert.deepEqual(multiWordNames, [
+    "Aloe Vera Vestige Gel",
+    "Vestige Aloe Vera Gel"
   ]);
 });
 
