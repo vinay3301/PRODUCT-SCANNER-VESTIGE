@@ -524,7 +524,7 @@ test("Stock-in history sorts newest first and products alphabetically", () => {
 
 test("Manual product search filters all typed words, prioritizes exact matches, and sorts alphabetically", () => {
   assert.ok(html.indexOf('class="manual-search-panel"') < html.indexOf('class="camera-wrap"'));
-  assert.match(html, /grid-template-columns:minmax\(0,4fr\) minmax\(70px,1fr\)/);
+  assert.match(html, /grid-template-columns:minmax\(0,4fr\) minmax\(0,1fr\)/);
   assert.match(html, /addEventListener\("input", renderManualProductSearch\)/);
   assert.match(html, /limitListTo\(results, 5, "contain"\)/);
   assert.match(html, /overscroll-behavior:contain/);
