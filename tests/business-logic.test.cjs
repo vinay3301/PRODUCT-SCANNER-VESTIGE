@@ -540,7 +540,7 @@ test("Manual product search filters all typed words, prioritizes exact matches, 
       { name: "Assure Enchant Face Wash" },
       { name: "Assure Body Lotion" }
     ],
-    normalizeText: value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\\s+/g, " ").trim()
+    normalizeText: value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim()
   };
   vm.runInNewContext(html.slice(start, end), context);
   const names = JSON.parse(JSON.stringify(
