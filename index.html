@@ -128,6 +128,28 @@ main {
   font-size:13px;
   overflow-wrap:anywhere;
 }
+.manual-search-result-content {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+}
+.manual-search-product-name {
+  min-width:0;
+  text-align:left;
+  overflow-wrap:anywhere;
+}
+.manual-search-stock {
+  flex:none;
+  font-size:11px;
+  font-weight:750;
+  white-space:nowrap;
+}
+.manual-search-stock.in-stock { color:#16834a; }
+.manual-search-stock.out-of-stock { color:#c63830; }
+:root[data-theme="dark"] .manual-search-stock.in-stock { color:#70d69b; }
+:root[data-theme="dark"] .manual-search-stock.out-of-stock { color:#ff8178; }
 .manual-search-result.selected {
   border-color:var(--green);
   background:var(--pill-bg);
@@ -1238,6 +1260,12 @@ function findManualProductMatches(query) {
     });
 }
 
+function getManualProductStockStatus(product) {
+  const key = normalizeText(product?.name || "");
+  const quantity = Math.max(0, Number(businessData?.inventory?.[key]?.quantity) || 0);
+  return quantity > 0 ? "In-stock" : "Out of stock";
+}
+
 function renderManualProductSearch() {
   const input = $("manualProductSearch");
   const results = $("manualProductResults");
@@ -1289,7 +1317,24 @@ function renderManualProductSearch() {
     option.className = "manual-search-result";
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", "false");
-    option.textContent = product.name;
+
+    const content = document.createElement("span");
+    content.className = "manual-search-result-content";
+
+    const name = document.createElement("span");
+    name.className = "manual-search-product-name";
+    name.textContent = product.name;
+
+    const stockStatus = getManualProductStockStatus(product);
+    const stock = document.createElement("span");
+    stock.className = "manual-search-stock " +
+      (stockStatus === "In-stock" ? "in-stock" : "out-of-stock");
+    stock.textContent = stockStatus;
+
+    content.appendChild(name);
+    content.appendChild(stock);
+    option.appendChild(content);
+
     option.addEventListener("click", () => {
       selectManualProduct(product);
     });
