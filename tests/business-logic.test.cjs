@@ -547,9 +547,10 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
     stopCount: 0,
     elements: new Map(),
     $ (id) {
-      if (!this.elements.has(id)) {
+      const elements = this.elements;
+      if (!elements.has(id)) {
         const classes = new Set(id === "cameraScannerArea" ? ["hidden"] : []);
-        this.elements.set(id, {
+        elements.set(id, {
           textContent: "",
           attrs: {},
           showModal() { this.modalOpen = true; },
@@ -559,10 +560,10 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
             add: value => classes.add(value),
             remove: value => classes.delete(value)
           },
-          setAttribute: (key, value) => this.elements.get(id).attrs[key] = value
+          setAttribute: (key, value) => { elements.get(id).attrs[key] = value; }
         });
       }
-      return this.elements.get(id);
+      return elements.get(id);
     },
     stopCamera() { this.stopCount++; },
     console
@@ -582,6 +583,12 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   assert.equal(cameraContext.$("cameraStopConfirmDialog").modalOpen, true);
   cameraContext.confirmCameraScannerClose();
   assert.equal(cameraContext.stopCount, 1);
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
+
+  cameraContext.handleCameraScannerToggle();
+  cameraContext.stream = { getTracks: () => [{ readyState: "ended" }] };
+  cameraContext.handleCameraScannerToggle();
+  assert.equal(cameraContext.stopCount, 2);
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
   assert.match(html, /selectManualProduct\(product\)/);
   assert.doesNotMatch(html, /manualProductSelectBtn|confirmManualProductSelection/);
