@@ -80,7 +80,7 @@ main {
 }
 .manual-search-row {
   display:grid;
-  grid-template-columns:minmax(0,4fr) minmax(70px,1fr);
+  grid-template-columns:minmax(0,4fr) minmax(0,1fr);
   gap:8px;
   align-items:stretch;
 }
@@ -1233,15 +1233,21 @@ function renderManualProductSearch() {
   }
 
   if (!products.length) {
-    results.textContent = "Loading product catalogue…";
+    const pendingLoad = productsLoading;
+    results.textContent = pendingLoad
+      ? "Loading product catalogue…"
+      : "Product catalogue unavailable. Reload the page to retry.";
     results.classList.remove("hidden");
-    loadProducts().then(loaded => {
-      if (loaded) {
-        renderManualProductSearch();
-      } else if (input.value.trim()) {
-        results.textContent = "Product catalogue unavailable. Check your connection and try again.";
-      }
-    });
+    if (pendingLoad) {
+      pendingLoad.then(loaded => {
+        if (!input.value.trim()) return;
+        if (loaded) {
+          renderManualProductSearch();
+        } else {
+          results.textContent = "Product catalogue unavailable. Reload the page to retry.";
+        }
+      });
+    }
     return;
   }
 
