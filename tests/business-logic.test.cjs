@@ -530,7 +530,7 @@ test("Manual product search filters all typed words, prioritizes exact matches, 
   assert.match(html, /overscroll-behavior:contain/);
 
   const start = html.indexOf("function findManualProductMatches(query)");
-  const end = html.indexOf("\\nfunction renderManualProductSearch()", start);
+  const end = html.indexOf("\nfunction renderManualProductSearch()", start);
   assert.ok(start >= 0 && end > start, "Could not locate manual product matching function");
   const context = {
     products: [
