@@ -3905,6 +3905,7 @@ function handleCameraScannerToggle() {
     return;
   }
 
+  if (stream) stopCamera();
   hideCameraScannerArea();
 }
 
