@@ -2741,10 +2741,13 @@ function setupSalesUI(){
   history.id="salesHistoryList";history.classList.remove("hidden");
   const section=document.createElement("section");
   section.id="salesHistorySection";section.className="sale-history-section hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div><div class="history-export-actions"><button type="button" class="secondary" id="shareSaleHistoryBtn">Share Sale History PDF</button></div>';
-  history.classList.add("sale-history-list");section.appendChild(history);$("shareSaleHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("sale"));$("shareStockHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("stock"));
+  history.classList.add("sale-history-list");section.appendChild(history);
   const checkout=$("postTransactionBtn"),actions=document.createElement("div");actions.className="sale-checkout-actions";
   const clearButton=document.createElement("button");clearButton.type="button";clearButton.id="clearSaleCartBtn";clearButton.className="clear-sale-cart-btn";clearButton.textContent="CLEAR SALE CART";
   checkout.textContent="CHECK OUT SALE";checkout.parentElement.replaceWith(actions);actions.append(checkout,clearButton);actions.insertAdjacentElement("afterend",section);
+  // Bind controls only after their dynamically-created section is attached to the document.
+  $("shareSaleHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("sale"));
+  $("shareStockHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("stock"));
   clearButton.addEventListener("click",()=>{if(!cart.length&&!cartName.trim()&&!editingSaleId)return;if(!confirm("Clear the current sale cart? This will not change stock or saved sale history."))return;cart=[];cartName="";editingSaleId=null;$("cartName").value="";saveCartToStorage();renderCart();setStatus("Sale cart cleared.");});
   const heading=$("cartSection").querySelector(".cart-heading");
   $("cartSection").querySelector(".cart-heading h2").textContent="SALE CART";
