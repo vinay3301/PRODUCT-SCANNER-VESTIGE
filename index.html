@@ -809,8 +809,8 @@ button:disabled {
 
 <header>
   <div>
-    <h1>Product Scanner</h1>
-    <div class="sub">Enhanced Multi-Pass OCR Match Engine</div>
+    <h1>VESTIGE SALES</h1>
+    <div class="sub">Smart Product and Sales Management</div>
   </div>
   <button class="theme-toggle" id="themeToggleBtn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
@@ -1201,8 +1201,8 @@ async function loadProducts() {
         throw new Error("The product database is empty.");
       }
 
-      $("apiBadge").textContent =
-        products.length + " products loaded";
+      $("apiBadge").textContent = "Products: "
+        products.length;
 
       $("apiBadge").style.borderColor = "#386449";
 
