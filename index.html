@@ -797,10 +797,9 @@ button:disabled {
       >
       <button
         type="button"
-        id="manualProductSelectBtn"
+        id="showCameraScannerBtn"
         class="manual-search-select"
-        disabled
-      >Select</button>
+      >SCAN</button>
     </div>
     <div
       id="manualProductResults"
@@ -810,25 +809,27 @@ button:disabled {
     ></div>
   </section>
 
-  <section class="camera-wrap">
-    <video id="video" autoplay playsinline muted></video>
-    <div class="scan-frame"></div>
-    <div class="scan-hint">
-      Keep the product name inside this horizontal frame
+  <section id="cameraScannerArea" class="camera-scanner-area hidden" aria-label="Camera scanner">
+    <section class="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="scan-frame"></div>
+      <div class="scan-hint">
+        Keep the product name inside this horizontal frame
+      </div>
+    </section>
+
+    <div class="controls">
+      <button class="primary" id="startBtn">Start camera</button>
+      <button class="secondary" id="captureBtn" disabled>Capture now</button>
+      <button class="secondary" id="stopBtn" disabled>Stop camera</button>
+    </div>
+
+    <div class="controls">
+      <button class="secondary hidden" id="scanAgainBtn">
+        Scan another product
+      </button>
     </div>
   </section>
-
-  <div class="controls">
-    <button class="primary" id="startBtn">Start camera</button>
-    <button class="secondary" id="captureBtn" disabled>Capture now</button>
-    <button class="secondary" id="stopBtn" disabled>Stop camera</button>
-  </div>
-
-  <div class="controls">
-    <button class="secondary hidden" id="scanAgainBtn">
-      Scan another product
-    </button>
-  </div>
 
   <div class="status" id="status">
     Loading product list…
@@ -873,8 +874,8 @@ button:disabled {
   </section>
 
   <div class="mode-switch" role="group" aria-label="Work mode">
-    <button type="button" id="stockingModeBtn" class="active">Stock</button>
-    <button type="button" id="sellingModeBtn">Selling</button>
+    <button type="button" id="stockingModeBtn">Stock</button>
+    <button type="button" id="sellingModeBtn" class="active">Selling</button>
   </div>
 
   <section class="business-panel" id="inventoryPanel">
@@ -1035,8 +1036,8 @@ let cart = [];
 let cartName = "";
 let savedCarts = [];
 let businessData = {schemaVersion:1,inventory:{},stockIns:[],sales:[]};
-let currentMode = "stocking";
-let cartMode = "stocking";
+let currentMode = "selling";
+let cartMode = "selling";
 let editingSaleId = null;
 let transactionBusy = false;
 
@@ -1191,8 +1192,6 @@ async function loadProducts() {
 // MANUAL PRODUCT SEARCH
 // ==========================================
 
-let manualSearchSelectedProduct = null;
-
 function findManualProductMatches(query) {
   const normalizedQuery = normalizeText(query);
   if (!normalizedQuery || !products.length) return [];
@@ -1200,8 +1199,8 @@ function findManualProductMatches(query) {
   const terms = normalizedQuery.split(" ").filter(Boolean);
   return products
     .filter(product => {
-      const normalizedName = normalizeText(product.name);
-      return terms.every(term => normalizedName.includes(term));
+      const nameWords = normalizeText(product.name).split(" ").filter(Boolean);
+      return terms.every(term => nameWords.some(word => word.startsWith(term)));
     })
     .sort((a, b) => {
       const aExact = normalizeText(a.name) === normalizedQuery;
@@ -1217,12 +1216,9 @@ function findManualProductMatches(query) {
 function renderManualProductSearch() {
   const input = $("manualProductSearch");
   const results = $("manualProductResults");
-  const selectButton = $("manualProductSelectBtn");
-  if (!input || !results || !selectButton) return;
+  if (!input || !results) return;
 
   const query = input.value.trim();
-  manualSearchSelectedProduct = null;
-  selectButton.disabled = true;
   results.innerHTML = "";
 
   if (!query) {
@@ -1270,14 +1266,7 @@ function renderManualProductSearch() {
     option.setAttribute("aria-selected", "false");
     option.textContent = product.name;
     option.addEventListener("click", () => {
-      manualSearchSelectedProduct = product;
-      results.querySelectorAll(".manual-search-result").forEach(row => {
-        row.classList.remove("selected");
-        row.setAttribute("aria-selected", "false");
-      });
-      option.classList.add("selected");
-      option.setAttribute("aria-selected", "true");
-      selectButton.disabled = false;
+      selectManualProduct(product);
     });
     results.appendChild(option);
   });
@@ -1286,17 +1275,14 @@ function renderManualProductSearch() {
   limitListTo(results, 5, "contain");
 }
 
-function confirmManualProductSelection() {
-  if (!manualSearchSelectedProduct) return;
-  const product = manualSearchSelectedProduct;
+function selectManualProduct(product) {
+  if (!product) return;
   selectProduct({product, score:1}, false, "manual");
-  manualSearchSelectedProduct = null;
   $("manualProductSearch").value = "";
   $("manualProductResults").innerHTML = "";
   $("manualProductResults").classList.add("hidden");
   $("manualProductResults").style.maxHeight = "";
   $("manualProductResults").style.overflowY = "visible";
-  $("manualProductSelectBtn").disabled = true;
 }
 
 // ==========================================
@@ -2922,7 +2908,7 @@ function initializeBusinessFeatures(){
   $("addStockProductBtn").addEventListener("click",addStockProductToCart);$("saleDateInput").value=formatLocalDateTimeInput(new Date());
   $("stockList").addEventListener("click",event=>{const button=event.target.closest("button[data-stock-key]");if(button)adjustStockQuantity(button.dataset.stockKey,Number(button.dataset.stockDelta));});
   $("clearStockBtn").addEventListener("click",clearAllStock);
-  setBusinessMode("stocking");renderStockHistory();renderSalesHistory();renderSalesOverview();
+  setBusinessMode(cart.length ? cartMode : "selling");renderStockHistory();renderSalesHistory();renderSalesOverview();
 }
 
 
@@ -3957,7 +3943,9 @@ $("themeToggleBtn").addEventListener("click",()=>{
 // ==========================================
 
 $("manualProductSearch").addEventListener("input", renderManualProductSearch);
-$("manualProductSelectBtn").addEventListener("click", confirmManualProductSelection);
+$("showCameraScannerBtn").addEventListener("click", () => {
+  $("cameraScannerArea").classList.remove("hidden");
+});
 
 $("startBtn").addEventListener("click", startCamera);
 
