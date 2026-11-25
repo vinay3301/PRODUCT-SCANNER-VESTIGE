@@ -558,11 +558,11 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ));
   assert.deepEqual(names, [
     "Ves",
+    "Aloe Vera Vestige Gel",
+    "Best Vestige Shampoo",
     "Vespa Body Lotion",
     "Vestige Aloe Vera Gel",
-    "Vestige Face Wash",
-    "Aloe Vera Vestige Gel",
-    "Best Vestige Shampoo"
+    "Vestige Face Wash"
   ]);
   const multiWordNames = JSON.parse(JSON.stringify(
     context.findManualProductMatches("ves gel").map(item => item.name)
