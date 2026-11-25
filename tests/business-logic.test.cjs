@@ -661,6 +661,25 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ]);
 });
 
+test("Sale and Stock-in histories expose individual and date-range PDF sharing", () => {
+  assert.match(html, /id="shareStockHistoryBtn"/);
+  assert.match(html, /id="shareSaleHistoryBtn"/);
+  assert.match(html, /data-history-share="stock"/);
+  assert.match(html, /data-history-share="sale"/);
+  assert.match(html, /id="historyShareFrom"/);
+  assert.match(html, /id="historyShareTo"/);
+  assert.match(html, /async function shareHistoryPdf/);
+  assert.match(html, /navigator\.share/);
+  assert.match(html, /doc\.output\("blob"\)/);
+  assert.match(html, /historyLocalDate\(d\)>=range\.from&&historyLocalDate\(d\)<=range\.to/);
+});
+
+test("Sale History typography matches the larger Stock-in History details", () => {
+  assert.match(html, /\.sale-history-list \.history-card strong\{font-size:15px\}/);
+  assert.match(html, /\.sale-history-list \.history-card small\{font-size:13px\}/);
+  assert.match(html, /\.sale-history-list \.history-detail\{font-size:15px;line-height:1\.6/);
+});
+
 (async () => {
   for (const result of results) {
     console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
