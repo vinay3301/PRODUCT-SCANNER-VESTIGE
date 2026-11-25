@@ -528,7 +528,68 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   assert.match(html, /addEventListener\("input", renderManualProductSearch\)/);
   assert.match(html, /id="showCameraScannerBtn"[^>]*>[\s\S]*?SCAN/);
   assert.match(html, /id="cameraScannerArea" class="camera-scanner-area hidden"/);
-  assert.match(html, /cameraScannerArea"\)\.classList\.remove\("hidden"\)/);
+  assert.match(html, /handleCameraScannerToggle/);
+  assert.match(html, /textContent = "CLOSE"/);
+  assert.match(html, /textContent = "SCAN"/);
+  assert.match(html, /id="cameraStopConfirmDialog"/);
+  assert.match(html, /id="confirmCameraStopBtn">STOP CAMERA/);
+  assert.match(html, /id="cancelCameraCloseBtn">CANCEL/);
+  assert.match(html, /Select product by SEARCH\/SCAN/);
+  assert.doesNotMatch(html, /Point the camera at a product/);
+
+  const closeStart = html.indexOf("function hideCameraScannerArea()");
+  const closeEnd = html.indexOf("\nfunction stopCamera(updateStatus", closeStart);
+  assert.ok(closeStart >= 0 && closeEnd > closeStart, "Could not locate camera close handlers");
+  const cameraElements = new Map();
+  const cameraStopCount = { value: 0 };
+  const cameraContext = {
+    cameraCloseAfterStart: false,
+    startingCamera: false,
+    stream: null,
+    $ (id) {
+      const elements = cameraElements;
+      if (!elements.has(id)) {
+        const classes = new Set(id === "cameraScannerArea" ? ["hidden"] : []);
+        elements.set(id, {
+          textContent: "",
+          attrs: {},
+          showModal() { this.modalOpen = true; },
+          close() { this.modalOpen = false; },
+          classList: {
+            contains: value => classes.has(value),
+            add: value => classes.add(value),
+            remove: value => classes.delete(value)
+          },
+          setAttribute: (key, value) => { elements.get(id).attrs[key] = value; }
+        });
+      }
+      return elements.get(id);
+    },
+    stopCamera: () => { cameraStopCount.value++; },
+    console
+  };
+  vm.runInNewContext(html.slice(closeStart, closeEnd), cameraContext);
+  cameraContext.handleCameraScannerToggle();
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), false);
+  assert.equal(cameraContext.$("showCameraScannerBtn").textContent, "CLOSE");
+  cameraContext.handleCameraScannerToggle();
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
+  assert.equal(cameraContext.$("showCameraScannerBtn").textContent, "SCAN");
+
+  cameraContext.handleCameraScannerToggle();
+  cameraContext.stream = { getTracks: () => [{ readyState: "live" }] };
+  cameraContext.handleCameraScannerToggle();
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), false);
+  assert.equal(cameraContext.$("cameraStopConfirmDialog").modalOpen, true);
+  cameraContext.confirmCameraScannerClose();
+  assert.equal(cameraStopCount.value, 1);
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
+
+  cameraContext.handleCameraScannerToggle();
+  cameraContext.stream = { getTracks: () => [{ readyState: "ended" }] };
+  cameraContext.handleCameraScannerToggle();
+  assert.equal(cameraStopCount.value, 2);
+  assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
   assert.match(html, /selectManualProduct\(product\)/);
   assert.doesNotMatch(html, /manualProductSelectBtn|confirmManualProductSelection/);
   assert.match(html, /limitListTo\(results, 5, "contain"\)/);
