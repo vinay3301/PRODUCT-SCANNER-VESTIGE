@@ -71,14 +71,81 @@ main {
   padding:0 12px 28px;
 }
 
+.manual-search-panel {
+  margin:0 0 10px;
+  padding:10px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+.manual-search-row {
+  display:grid;
+  grid-template-columns:minmax(0,4fr) minmax(70px,1fr);
+  gap:8px;
+  align-items:stretch;
+}
+.manual-search-input {
+  width:100%;
+  min-width:0;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--input-bg);
+  color:var(--text);
+  font:inherit;
+  font-size:14px;
+}
+.manual-search-input:focus {
+  outline:2px solid var(--green);
+  outline-offset:1px;
+}
+.manual-search-select {
+  min-width:0;
+  padding:10px 5px;
+  border-radius:10px;
+  background:var(--green);
+  color:var(--primary-text);
+  font-size:13px;
+}
+.manual-search-results {
+  display:grid;
+  gap:6px;
+  margin-top:9px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.manual-search-result {
+  width:100%;
+  min-height:42px;
+  padding:9px 11px;
+  text-align:left;
+  line-height:1.35;
+  background:var(--raised);
+  color:var(--text);
+  border:1px solid var(--line);
+  border-radius:9px;
+  font-size:13px;
+  overflow-wrap:anywhere;
+}
+.manual-search-result.selected {
+  border-color:var(--green);
+  background:var(--pill-bg);
+  box-shadow:inset 0 0 0 1px var(--green);
+}
+.manual-search-empty {
+  padding:10px 8px;
+  color:var(--muted);
+  font-size:12px;
+}
 .camera-wrap {
   position:relative;
   background:#000;
   border:1px solid var(--line);
   border-radius:18px;
   overflow:hidden;
-  height:min(62vh, 390px);
-  min-height:280px;
+  height:min(54vh, 340px);
+  min-height:240px;
 }
 
 video {
@@ -717,6 +784,32 @@ button:disabled {
 
 <main>
 
+  <section class="manual-search-panel" aria-label="Manual product search">
+    <div class="manual-search-row">
+      <input
+        type="search"
+        id="manualProductSearch"
+        class="manual-search-input"
+        placeholder="Search product from catalogue…"
+        aria-label="Search products by name"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button
+        type="button"
+        id="manualProductSelectBtn"
+        class="manual-search-select"
+        disabled
+      >Select</button>
+    </div>
+    <div
+      id="manualProductResults"
+      class="manual-search-results hidden"
+      role="listbox"
+      aria-label="Matching products"
+    ></div>
+  </section>
+
   <section class="camera-wrap">
     <video id="video" autoplay playsinline muted></video>
     <div class="scan-frame"></div>
@@ -1092,6 +1185,112 @@ async function loadProducts() {
   } finally {
     productsLoading = null;
   }
+}
+
+// ==========================================
+// MANUAL PRODUCT SEARCH
+// ==========================================
+
+let manualSearchSelectedProduct = null;
+
+function findManualProductMatches(query) {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery || !products.length) return [];
+
+  const terms = normalizedQuery.split(" ").filter(Boolean);
+  return products
+    .filter(product => {
+      const normalizedName = normalizeText(product.name);
+      return terms.every(term => normalizedName.includes(term));
+    })
+    .sort((a, b) => {
+      const aExact = normalizeText(a.name) === normalizedQuery;
+      const bExact = normalizeText(b.name) === normalizedQuery;
+      if (aExact !== bExact) return aExact ? -1 : 1;
+      return String(a.name).localeCompare(String(b.name), "en", {
+        sensitivity:"base",
+        numeric:true
+      });
+    });
+}
+
+function renderManualProductSearch() {
+  const input = $("manualProductSearch");
+  const results = $("manualProductResults");
+  const selectButton = $("manualProductSelectBtn");
+  if (!input || !results || !selectButton) return;
+
+  const query = input.value.trim();
+  manualSearchSelectedProduct = null;
+  selectButton.disabled = true;
+  results.innerHTML = "";
+
+  if (!query) {
+    results.classList.add("hidden");
+    results.style.maxHeight = "";
+    results.style.overflowY = "visible";
+    return;
+  }
+
+  if (!products.length) {
+    results.textContent = "Loading product catalogue…";
+    results.classList.remove("hidden");
+    loadProducts().then(loaded => {
+      if (loaded) {
+        renderManualProductSearch();
+      } else if (input.value.trim()) {
+        results.textContent = "Product catalogue unavailable. Check your connection and try again.";
+      }
+    });
+    return;
+  }
+
+  const matches = findManualProductMatches(query);
+  if (!matches.length) {
+    const empty = document.createElement("div");
+    empty.className = "manual-search-empty";
+    empty.textContent = "No matching products found.";
+    results.appendChild(empty);
+    results.classList.remove("hidden");
+    limitListTo(results, 5, "contain");
+    return;
+  }
+
+  matches.forEach(product => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "manual-search-result";
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.textContent = product.name;
+    option.addEventListener("click", () => {
+      manualSearchSelectedProduct = product;
+      results.querySelectorAll(".manual-search-result").forEach(row => {
+        row.classList.remove("selected");
+        row.setAttribute("aria-selected", "false");
+      });
+      option.classList.add("selected");
+      option.setAttribute("aria-selected", "true");
+      selectButton.disabled = false;
+    });
+    results.appendChild(option);
+  });
+
+  results.classList.remove("hidden");
+  limitListTo(results, 5, "contain");
+}
+
+function confirmManualProductSelection() {
+  if (!manualSearchSelectedProduct) return;
+  const product = manualSearchSelectedProduct;
+  selectProduct({product, score:1}, false, "manual");
+  manualSearchSelectedProduct = null;
+  $("manualProductSearch").value = "";
+  $("manualProductResults").innerHTML = "";
+  $("manualProductResults").classList.add("hidden");
+  $("manualProductResults").style.maxHeight = "";
+  $("manualProductResults").style.overflowY = "visible";
+  $("manualProductSelectBtn").disabled = true;
 }
 
 // ==========================================
@@ -2878,7 +3077,7 @@ function findMatches(ocrText) {
 // SELECT PRODUCT
 // ==========================================
 
-function selectProduct(item, automatic = false) {
+function selectProduct(item, automatic = false, source = "scan") {
 
   if (finalSelectionMade && automatic) return;
 
@@ -2897,12 +3096,12 @@ function selectProduct(item, automatic = false) {
   $("dp").textContent = formatMoney(p.DP);
   $("pv").textContent = p.pv ?? "—";
 
-  $("matchMeta").textContent =
-    (automatic
+  $("matchMeta").textContent = source === "manual"
+    ? "Selected from the manual product catalogue"
+    : (automatic
       ? "Automatically selected match"
       : "Manually selected product") +
-    " · Match score: " +
-    Math.round(item.score * 100) + "%";
+        " · Match score: " + Math.round(item.score * 100) + "%";
 
   if (automatic) {
     $("choices").classList.remove("hidden");
@@ -2910,24 +3109,31 @@ function selectProduct(item, automatic = false) {
     $("choices").classList.add("hidden");
   }
 
-  $("selectionNote").textContent = automatic
-    ? "✓ Automatically selected. You can still choose another product below."
-    : "✓ Your selection: " + p.name;
+  $("selectionNote").textContent = source === "manual"
+    ? "✓ Selected from product search: " + p.name
+    : (automatic
+      ? "✓ Automatically selected. You can still choose another product below."
+      : "✓ Your selection: " + p.name);
 
   $("selectionNote").classList.remove("hidden");
 
   $("addToCartBtn").classList.remove("hidden");
   $("addToCartBtn").textContent = "＋ Add to Cart";
 
-  $("scanAgainBtn").classList.remove("hidden");
-
-  $("captureBtn").disabled = true;
+  if (stream) {
+    $("scanAgainBtn").classList.remove("hidden");
+    $("captureBtn").disabled = true;
+  } else {
+    $("scanAgainBtn").classList.add("hidden");
+  }
 
   setStatus(
-    automatic
-      ? "Automatically selected: " + p.name +
-        ". You can choose another match below."
-      : "Manually selected: " + p.name
+    source === "manual"
+      ? "Selected from manual search: " + p.name
+      : automatic
+        ? "Automatically selected: " + p.name +
+          ". You can choose another match below."
+        : "Manually selected: " + p.name
   );
 }
 
@@ -3743,6 +3949,9 @@ $("themeToggleBtn").addEventListener("click",()=>{
 // ==========================================
 // EVENT LISTENERS
 // ==========================================
+
+$("manualProductSearch").addEventListener("input", renderManualProductSearch);
+$("manualProductSelectBtn").addEventListener("click", confirmManualProductSelection);
 
 $("startBtn").addEventListener("click", startCamera);
 
