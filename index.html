@@ -3908,6 +3908,15 @@ function handleCameraScannerToggle() {
   hideCameraScannerArea();
 }
 
+function confirmCameraScannerClose() {
+  if (startingCamera) {
+    cameraCloseAfterStart = true;
+    return;
+  }
+  stopCamera();
+  hideCameraScannerArea();
+}
+
 function stopCamera(updateStatus = true) {
 
   scanSession++;
@@ -4010,15 +4019,6 @@ $("showCameraScannerBtn").addEventListener("click", handleCameraScannerToggle);
 $("cancelCameraCloseBtn").addEventListener("click", () => {
   $("cameraStopConfirmDialog").close();
 });
-function confirmCameraScannerClose() {
-  if (startingCamera) {
-    cameraCloseAfterStart = true;
-    return;
-  }
-  stopCamera();
-  hideCameraScannerArea();
-}
-
 $("confirmCameraStopBtn").addEventListener("click", () => {
   $("cameraStopConfirmDialog").close();
   confirmCameraScannerClose();
