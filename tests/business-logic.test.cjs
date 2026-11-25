@@ -541,11 +541,11 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   const closeEnd = html.indexOf("\nfunction stopCamera(updateStatus", closeStart);
   assert.ok(closeStart >= 0 && closeEnd > closeStart, "Could not locate camera close handlers");
   const cameraElements = new Map();
+  const cameraStopCount = { value: 0 };
   const cameraContext = {
     cameraCloseAfterStart: false,
     startingCamera: false,
     stream: null,
-    stopCount: 0,
     $ (id) {
       const elements = cameraElements;
       if (!elements.has(id)) {
@@ -565,7 +565,7 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
       }
       return elements.get(id);
     },
-    stopCamera() { this.stopCount++; },
+    stopCamera: () => { cameraStopCount.value++; },
     console
   };
   vm.runInNewContext(html.slice(closeStart, closeEnd), cameraContext);
@@ -582,13 +582,13 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), false);
   assert.equal(cameraContext.$("cameraStopConfirmDialog").modalOpen, true);
   cameraContext.confirmCameraScannerClose();
-  assert.equal(cameraContext.stopCount, 1);
+  assert.equal(cameraStopCount.value, 1);
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
 
   cameraContext.handleCameraScannerToggle();
   cameraContext.stream = { getTracks: () => [{ readyState: "ended" }] };
   cameraContext.handleCameraScannerToggle();
-  assert.equal(cameraContext.stopCount, 2);
+  assert.equal(cameraStopCount.value, 2);
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
   assert.match(html, /selectManualProduct\(product\)/);
   assert.doesNotMatch(html, /manualProductSelectBtn|confirmManualProductSelection/);
