@@ -1201,8 +1201,7 @@ async function loadProducts() {
         throw new Error("The product database is empty.");
       }
 
-      $("apiBadge").textContent = "Products: "
-        products.length;
+      $("apiBadge").textContent = "Products: "+ products.length;
 
       $("apiBadge").style.borderColor = "#386449";
 
