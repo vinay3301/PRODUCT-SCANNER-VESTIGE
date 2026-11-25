@@ -1,6 +1,6 @@
 # Product Scanner Vestige
 
-A mobile-friendly, browser-based product scanner and dealer stock/sales manager for Vestige products. It combines camera-based OCR product identification with local inventory, stock-in, and sales workflows.
+A mobile-friendly, browser-based Vestige product and dealer sales manager. The application supports two ways to find products: live catalogue search and camera-based OCR scanning. It combines product pricing, local dealer inventory, stock-in, and sales workflows.
 
 **Live application:** https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/  
 **Source repository:** https://github.com/vinay3301/PRODUCT-SCANNER-VESTIGE
@@ -69,8 +69,8 @@ Stock quantities, stock-in records, sales records, and the active cart are store
 
 1. Open the [live application](https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/) in a modern browser.
 2. Wait for the product-count/API badge in the header to show that products have loaded.
-3. Allow camera permission when prompted, then use **Start camera** to scan products.
-4. Choose **Stock** to enter stock received, or **Selling** to prepare a customer sale.
+3. Find a product by typing in the manual catalogue search, or press **SCAN** to reveal the camera scanner and then press **Start camera**.
+4. The application opens in **Selling** mode when there is no unfinished cart. Choose **Stock** when entering stock received.
 5. Use **Export backup** regularly and keep the downloaded JSON file somewhere safe.
 
 Camera access normally requires HTTPS. The GitHub Pages address is served over HTTPS.
@@ -79,8 +79,9 @@ Camera access normally requires HTTPS. The GitHub Pages address is served over H
 
 The page contains these main areas:
 
-- **Header:** application title, light/dark theme control, and product API status.
-- **Camera preview:** live camera image and the horizontal product-name scanning frame.
+- **Header:** VESTIGE SALES title, light/dark theme control, and product catalogue status.
+- **Manual product search:** catalogue search field, SCAN/CLOSE toggle, matching product list, and local stock-status labels.
+- **Camera scanner:** hidden until opened with SCAN; contains the live camera image, horizontal product-name scanning frame, and camera controls.
 - **Product card:** selected product name, MRP, DP, PV, match information, and product-match choices.
 - **Work-mode switch:** Stock and Selling.
 - **Current Stock panel:** stock value summary, stock list, stock-in history, and clear-stock action. Shown in Stock mode.
@@ -93,7 +94,24 @@ The page contains these main areas:
 
 ## Button-by-button guide
 
-### 1. Scanner controls
+### 1. Manual product search
+
+The manual search is positioned above the camera scanner and uses an approximately **80% search field / 20% SCAN button** layout.
+
+| Control | What it does |
+|---|---|
+| **Search product from catalogue** | Filters the already-loaded product catalogue as you type; it does not send a separate API request for every keystroke. Every typed term must match the beginning of a word in the product name. A full exact-name match is prioritised, and the remaining matches are sorted alphabetically. |
+| **Matching product row** | Shows the product name on the left and its dealer stock status on the right. **In-stock** appears in green when the browser's local inventory quantity is greater than zero; **Out of stock** appears in red when the quantity is zero, negative, or missing. |
+| **Select a matching product row** | Immediately selects that product and displays its MRP, DP, and PV in the existing product card. The search field and result list are then cleared. |
+| **Search results area** | Shows up to five rows in its visible area. Additional matches are available by scrolling inside the results area; scrolling is contained so it does not chain to the surrounding page. |
+| **SCAN** | Reveals the camera scanner area. It does not start the camera automatically; use **Start camera** inside the revealed area when ready. |
+| **CLOSE** | Hides the scanner area when the camera is not running. If the camera is running or still starting, a confirmation dialog appears. |
+| **CANCEL** | Closes the confirmation dialog and leaves the scanner open with the camera state unchanged. |
+| **STOP CAMERA** | Stops the camera and closes the scanner area after confirmation. |
+
+Stock status is read from this browser's local dealer inventory. It is not a live lookup of another device or a remote dealer database.
+
+### 2. Scanner controls
 
 | Button | What it does |
 |---|---|
@@ -104,7 +122,7 @@ The page contains these main areas:
 
 **Scanning tip:** Keep the printed product name inside the horizontal frame. Good lighting, a steady phone, and readable text improve recognition.
 
-### 2. Product selection
+### 3. Product selection
 
 | Control | What it does |
 |---|---|
@@ -112,18 +130,18 @@ The page contains these main areas:
 | **＋ Add to Cart** | Adds one unit of the selected product to the active Stock-in Cart or Sale Cart. In an Actual Sale, the application prevents adding more units than the available stock. |
 | **Match score** | Shows how closely the OCR text matches a catalogue product. It is an algorithmic similarity score, not a guarantee or probability that the product is correct. |
 
-The matching engine displays up to five candidates. A sufficiently high top match can be selected automatically after a short delay, but the user can still choose a different suggested result. If the match is uncertain, select the correct result manually.
+The camera OCR matching engine displays up to five candidates. A sufficiently high top match can be selected automatically after a short delay, but the user can still choose a different suggested result. If the match is uncertain, select the correct result manually. Manual catalogue search is a separate path and selects a product immediately when its result row is tapped.
 
-### 3. Work-mode controls
+### 4. Work-mode controls
 
 | Button | What it does |
 |---|---|
 | **Stock** | Switches to the stock-in workflow. Shows Current Stock, stock list, stock-in history, and the Stock-in Cart. The transaction button becomes **SAVE STOCK-IN**. |
 | **Selling** | Switches to the selling workflow. Shows sale controls and Sale History, changes the cart to Sale Cart, and makes the transaction button **CHECK OUT SALE**. |
 
-The active cart is stored locally. Avoid switching modes while a cart is in progress unless you understand which workflow the cart belongs to.
+The application opens in **Selling** mode when there is no unfinished cart. If an unfinished cart exists, its saved purpose (Stock or Selling) is restored instead. The active cart is stored locally; switching modes does not silently clear the cart or change its purpose.
 
-### 4. Stock mode
+### 5. Stock mode
 
 The Current Stock panel is visible in Stock mode.
 
@@ -139,7 +157,7 @@ The Current Stock panel is visible in Stock mode.
 
 The Stock-in Cart name field is optional. It can be used for a supplier name, invoice/reference, or a short note. If left blank, the transaction is labelled **Stock-in**.
 
-### 5. Selling mode
+### 6. Selling mode
 
 Selling mode provides the customer sale workflow.
 
@@ -166,7 +184,7 @@ Each cart product row includes a free-quantity field in the selling workflow.
 
 Example: if a customer receives 3 units and 1 is free, the cart quantity is 3, free quantity is 1, and 2 units are treated as paid units. An Actual Sale deducts all 3 units from stock.
 
-### 6. Cart controls used in both modes
+### 7. Cart controls used in both modes
 
 | Control | What it does |
 |---|---|
@@ -178,7 +196,7 @@ Example: if a customer receives 3 units and 1 is free, the cart quantity is 3, f
 
 The cart is saved locally as it is edited, so a page refresh in the same browser profile should restore the active cart when browser storage remains available.
 
-### 7. History controls
+### 8. History controls
 
 Stock-in History is in Stock mode; Sale History is in Selling mode.
 
@@ -190,16 +208,16 @@ Stock-in History is in Stock mode; Sale History is in Selling mode.
 
 Sale History is ordered newest first by sale date/time. Stock-in History is ordered newest first by stock-in creation time. Products inside an expanded stock-in record are alphabetically ordered.
 
-### 8. Backup controls
+### 9. Backup controls
 
 | Button | What it does |
 |---|---|
-| **Export backup** | Downloads a versioned JSON backup containing business inventory, stock-in history, sales history, the active cart, and saved-cart storage data. Keep the downloaded file somewhere separate from the device. |
+| **Export backup** | Downloads a versioned JSON backup containing business inventory, stock-in history, sales history, and the active cart. The file also retains the saved-cart data field for backup-format compatibility, but the current interface does not provide saved-cart management controls. Keep the downloaded file somewhere separate from the device. |
 | **Import backup** | Opens a file picker for a previously exported Product Scanner JSON backup. The application validates the file and asks for confirmation before replacing the business data and cart data in this browser. |
 
-**Import is a replacement, not a merge.** It replaces the current stock, stock-in history, sales history, active cart, and saved-cart data with the contents of the selected backup. Export the current state first if you may need it later.
+**Import is a replacement, not a merge.** It replaces the current stock, stock-in history, sales history, active cart, and saved-cart compatibility data with the contents of the selected backup. Export the current state first if you may need it later.
 
-### 9. Theme control
+### 10. Theme control
 
 | Button | What it does |
 |---|---|
@@ -248,6 +266,7 @@ When **Record** is selected:
 
 To keep the page compact on phones:
 
+- Manual catalogue search shows up to **five matching products** in its visible area; additional matches are available by scrolling inside that results area.
 - The Stock List shows up to **five products** in its visible area; additional products are available by scrolling inside that list.
 - Stock-in History shows up to **five transaction summaries** in its visible area; additional records are available by scrolling inside the list.
 - Sale History shows up to **five transaction summaries** in its visible area; additional records are available by scrolling inside the list.
@@ -282,6 +301,7 @@ The backup file contains business records and product details. Treat it as priva
 - Camera permission is required for camera scanning. Product selection from the available-stock dropdown can be used in Selling mode without scanning.
 - OCR results can be imperfect. Always verify the product name and price details before adding or checking out.
 - A match score is a similarity measure, not a correctness guarantee.
+- Manual search stock labels reflect this browser's local inventory at the time the results are rendered; they do not represent stock held by other devices or dealers.
 - Actual Sale and Record Sale have different inventory effects. Confirm the selected sale type before checkout.
 - **Payment-method logging (Cash / Online) is not exposed as a control in the current index.html workflow.** This README intentionally does not describe it as an available feature.
 - The current application does not provide automatic cloud synchronisation of dealer stock or sales data.
@@ -316,4 +336,4 @@ A frontend-only README or HTML change does not require a Cloudflare Worker deplo
 
 ---
 
-*Documentation checked against the current main-branch application source and the recent merged history through the expandable-history update (PR #10). Keep this guide synchronized with future UI and workflow changes.*
+*Documentation checked against the current `main` branch `index.html`, regression test file, and merged PRs #12–#15, plus the two later direct `index.html` commits that updated the page title/status text and product-count badge. Keep this guide synchronized with future UI and workflow changes.*
