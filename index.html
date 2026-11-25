@@ -1164,17 +1164,19 @@ async function loadProducts() {
   if (productsLoading) return productsLoading;
 
   productsLoading = (async () => {
+    const maxAttempts = 2;
+    let lastError = null;
 
-    $("apiBadge").textContent = "Connecting…";
-
-    try {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      $("apiBadge").textContent = attempt === 0
+        ? "Connecting…"
+        : "Retrying connection…";
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      let response;
       try {
-        response = await fetch(API_URL, {
+        const response = await fetch(API_URL, {
           method:"GET",
           mode:"cors",
           cache:"no-store",
@@ -1183,57 +1185,59 @@ async function loadProducts() {
             "Accept":"application/json"
           }
         });
+
+        if (!response.ok) {
+          throw new Error("Product API returned HTTP " + response.status + ".");
+        }
+
+        // Keep the timeout active until the complete response body is parsed.
+        const data = await response.json();
+
+        if (
+          !data ||
+          data.success !== true ||
+          !Array.isArray(data.products)
+        ) {
+          throw new Error(data?.error || "The product API returned an invalid response.");
+        }
+
+        const loadedProducts = data.products.filter(product =>
+          product && String(product.name || "").trim()
+        );
+
+        if (!loadedProducts.length) {
+          throw new Error("The product database returned no products.");
+        }
+
+        products = loadedProducts;
+        $("apiBadge").textContent = "Products: " + products.length;
+        $("apiBadge").style.borderColor = "#386449";
+        setStatus("Product database ready. Start the camera to scan.");
+        return true;
+
+      } catch (error) {
+        lastError = error?.name === "AbortError"
+          ? new Error("Product API request timed out after 15 seconds.")
+          : error;
+
       } finally {
         clearTimeout(timeoutId);
       }
 
-      if (!response.ok) {
-        throw new Error("API returned HTTP " + response.status);
+      if (attempt + 1 < maxAttempts) {
+        setStatus("Product database connection failed. Retrying once…");
+        await new Promise(resolve => setTimeout(resolve, 700));
       }
-
-      const data = await response.json();
-
-      if (
-        !data ||
-        data.success !== true ||
-        !Array.isArray(data.products)
-      ) {
-        throw new Error(data?.error || "Invalid product API response.");
-      }
-
-      products = data.products.filter(p =>
-        p && String(p.name || "").trim()
-      );
-
-      if (!products.length) {
-        throw new Error("The product database is empty.");
-      }
-
-      $("apiBadge").textContent = "Products: "+ products.length;
-
-      $("apiBadge").style.borderColor = "#386449";
-
-      setStatus("Product database ready. Start the camera to scan.");
-
-      return true;
-
-    } catch (error) {
-
-      products = [];
-
-      $("apiBadge").textContent = "API not connected";
-      $("apiBadge").style.borderColor = "#a64b4b";
-
-      const message = error?.name === "AbortError"
-        ? "Request timed out after 15 seconds."
-        : (error?.message || String(error));
-
-      setStatus("Product API error: " + message);
-
-      return false;
     }
 
-  })();
+    throw lastError || new Error("Unable to load the product database.");
+  })().catch(error => {
+    products = [];
+    $("apiBadge").textContent = "API not connected";
+    $("apiBadge").style.borderColor = "#a64b4b";
+    setStatus("Product API error: " + (error?.message || String(error)));
+    return false;
+  });
 
   try {
     return await productsLoading;
