@@ -661,6 +661,15 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ]);
 });
 
+test("Dynamically-created Sale History controls are attached before their listeners are bound", () => {
+  const sectionInsert = html.indexOf('actions.insertAdjacentElement("afterend",section)');
+  const saleShareListener = html.indexOf('$("shareSaleHistoryBtn").addEventListener');
+  const stockShareListener = html.indexOf('$("shareStockHistoryBtn").addEventListener');
+  assert.ok(sectionInsert >= 0, "Sale History section must be inserted into the document");
+  assert.ok(saleShareListener > sectionInsert, "Sale History share button listener must be bound after insertion");
+  assert.ok(stockShareListener > sectionInsert, "Stock-in share button listener must be bound after insertion");
+});
+
 test("Sale and Stock-in histories expose individual and date-range PDF sharing", () => {
   assert.match(html, /id="shareStockHistoryBtn"/);
   assert.match(html, /id="shareSaleHistoryBtn"/);
