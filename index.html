@@ -1106,7 +1106,7 @@ function clearProductDisplay() {
   selectedProduct = null;
 
   $("productName").textContent =
-    "Point the camera at a product";
+    "Select product by SEARCH/SCAN";
 
   $("mrp").textContent = "—";
   $("dp").textContent = "—";
@@ -3884,7 +3884,7 @@ function hideCameraScannerArea() {
 function finishPendingCameraClose() {
   if (!cameraCloseAfterStart) return false;
   cameraCloseAfterStart = false;
-  stopCamera(false);
+  stopCamera();
   hideCameraScannerArea();
   return true;
 }
