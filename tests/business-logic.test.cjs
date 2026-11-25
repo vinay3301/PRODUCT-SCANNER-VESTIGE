@@ -540,14 +540,14 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   const closeStart = html.indexOf("function hideCameraScannerArea()");
   const closeEnd = html.indexOf("\nfunction stopCamera(updateStatus", closeStart);
   assert.ok(closeStart >= 0 && closeEnd > closeStart, "Could not locate camera close handlers");
+  const cameraElements = new Map();
   const cameraContext = {
     cameraCloseAfterStart: false,
     startingCamera: false,
     stream: null,
     stopCount: 0,
-    elements: new Map(),
     $ (id) {
-      const elements = this.elements;
+      const elements = cameraElements;
       if (!elements.has(id)) {
         const classes = new Set(id === "cameraScannerArea" ? ["hidden"] : []);
         elements.set(id, {
