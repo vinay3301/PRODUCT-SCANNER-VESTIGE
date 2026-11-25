@@ -3813,6 +3813,7 @@ async function startCamera() {
     video.srcObject = stream;
 
     await video.play();
+    if (finishPendingCameraClose()) return;
 
     if (!worker) {
 
@@ -4010,7 +4011,7 @@ $("cancelCameraCloseBtn").addEventListener("click", () => {
   $("cameraStopConfirmDialog").close();
 });
 function confirmCameraScannerClose() {
-  if (startingCamera && !stream) {
+  if (startingCamera) {
     cameraCloseAfterStart = true;
     return;
   }
