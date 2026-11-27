@@ -802,10 +802,10 @@ test("All PDF exports use descriptive Vestige filenames and cart-inspired brande
   assert.match(html, /function pdfDrawTable\(/);
   assert.match(html, /function pdfShareOrDownload\(/);
   assert.match(html, /Vestige_Current_Stock_/);
-  assert.match(html, /Vestige_Sale_Record_/);
-  assert.match(html, /Vestige_Stock_In_Record_/);
-  assert.match(html, /Vestige_Sale_History_/);
-  assert.match(html, /Vestige_Stock_In_History_/);
+  assert.match(html, /isSale\?"Sale":"Stock_In"/);
+  assert.match(html, /id\?"_Record":"_History"/);
+  assert.match(html, /range\?range\.from\+"_to_"\+range\.to/);
+  assert.match(html, /pdfDateTimeStamp\(date\)/);
   assert.match(html, /_to_/);
   assert.match(html, /PAYMENT STATUS:/);
   assert.match(html, /SALE TYPE:/);
