@@ -2898,17 +2898,116 @@ async function clearAllStock(){
   Object.values(next.inventory).forEach(row=>{row.quantity=0;row.updatedAt=now;});
   if(saveBusinessData(next)){renderInventory();renderCart();renderStockHistory();setStatus("All stock quantities cleared. Product catalogue and history were kept.");}
 }
+function pdfDateStamp(value=new Date()){
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return "unknown-date";
+  const p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+}
+function pdfDateTimeStamp(value=new Date()){
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return pdfDateStamp(new Date());
+  const p=n=>String(n).padStart(2,"0");
+  return pdfDateStamp(d)+"_"+p(d.getHours())+p(d.getMinutes());
+}
+function pdfDisplayDate(value){
+  const d=new Date(value);return Number.isNaN(d.getTime())?"Date unavailable":d.toLocaleString("en-IN");
+}
+function pdfPalette(type){
+  return type==="sale"?{primary:[18,75,132],secondary:[28,150,83],soft:[232,242,251],accent:[223,245,231]}:
+    {primary:[20,105,65],secondary:[39,155,83],soft:[231,245,236],accent:[224,241,250]};
+}
+function pdfStartPage(doc,title,subtitle,type){
+  const pw=doc.internal.pageSize.getWidth(),c=pdfPalette(type);
+  doc.setFillColor(248,250,249);doc.rect(0,0,pw,297,"F");
+  doc.setFillColor(...c.primary);doc.roundedRect(12,10,pw-24,31,4,4,"F");
+  doc.setFillColor(...c.secondary);doc.roundedRect(12,37,pw-24,4,2,2,"F");
+  doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(220,241,228);doc.text("VESTIGE  |  PRODUCT & BUSINESS MANAGEMENT",18,19);
+  doc.setFontSize(17);doc.setTextColor(255,255,255);doc.text(title,18,29);
+  doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(232,243,237);doc.text(String(subtitle||""),pw-18,19,{align:"right"});
+  return 49;
+}
+function pdfEnsureSpace(doc,y,height,title,subtitle,type){
+  const ph=doc.internal.pageSize.getHeight();
+  if(y+height>ph-17){doc.addPage();return pdfStartPage(doc,title,subtitle,type);}
+  return y;
+}
+function pdfDrawSummaryCards(doc,cards,y,type){
+  const pw=doc.internal.pageSize.getWidth(),gap=3,left=14,totalW=pw-28,w=(totalW-gap*(cards.length-1))/cards.length,h=22;
+  const palette=pdfPalette(type),fills=[[232,245,236],[231,242,251],[246,240,255],[255,244,225]];
+  cards.forEach((card,i)=>{
+    const x=left+i*(w+gap),fill=fills[i%fills.length];
+    doc.setFillColor(...fill);doc.roundedRect(x,y,w,h,2.5,2.5,"F");
+    doc.setFont("helvetica","normal");doc.setFontSize(7);doc.setTextColor(75,91,81);doc.text(String(card.label),x+3,y+7);
+    doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(...(i===0?palette.primary:palette.secondary));
+    const value=doc.splitTextToSize(String(card.value),w-6);doc.text(value.slice(0,2),x+3,y+15);
+  });
+  return y+h+7;
+}
+function pdfDrawTable(doc,columns,rows,y,meta){
+  const {type,title,subtitle,widths}=meta,pw=doc.internal.pageSize.getWidth(),left=14,tableW=pw-28;
+  const palette=pdfPalette(type),headerH=10;
+  const drawHeader=()=>{
+    let x=left;doc.setFillColor(...palette.primary);doc.roundedRect(left,y,tableW,headerH,2,2,"F");
+    columns.forEach((col,i)=>{const w=widths[i];doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text(col.label,x+(col.align==="right"?w-3:3),y+6.5,{align:col.align==="right"?"right":"left"});x+=w;});
+    y+=headerH;
+  };
+  drawHeader();
+  rows.forEach((row,index)=>{
+    const cells=row.map((value,i)=>doc.splitTextToSize(String(value??""),widths[i]-6));
+    const lines=Math.max(1,...cells.map(v=>v.length)),h=Math.max(9,lines*4+4);
+    const ph=doc.internal.pageSize.getHeight();
+    if(y+h>ph-17){doc.addPage();y=pdfStartPage(doc,title,subtitle,type);drawHeader();}
+    doc.setFillColor(...(index%2===0?[255,255,255]:palette.soft));doc.rect(left,y,tableW,h,"F");
+    doc.setDrawColor(220,228,222);doc.setLineWidth(.2);doc.line(left,y+h,left+tableW,y+h);
+    let x=left;
+    columns.forEach((col,i)=>{
+      doc.setFont("helvetica",i===0?"bold":"normal");doc.setFontSize(8);doc.setTextColor(38,51,43);
+      doc.text(cells[i],x+(col.align==="right"?widths[i]-3:3),y+5,{align:col.align==="right"?"right":"left"});
+      x+=widths[i];
+    });
+    y+=h;
+  });
+  return y+5;
+}
+function pdfDrawRecordHeading(doc,label,stamp,y,type,title,subtitle){
+  const pw=doc.internal.pageSize.getWidth(),c=pdfPalette(type);
+  y=pdfEnsureSpace(doc,y,17,title,subtitle,type);
+  doc.setFillColor(...c.soft);doc.roundedRect(14,y,pw-28,14,2.5,2.5,"F");
+  doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(...c.primary);doc.text(String(label||"Transaction"),18,y+5.5);
+  doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(75,91,81);doc.text(String(stamp||""),pw-18,y+10,{align:"right"});
+  return y+19;
+}
+async function pdfShareOrDownload(doc,filename,title,description){
+  const blob=doc.output("blob"),file=new File([blob],filename,{type:"application/pdf"});
+  try{
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title,text:description});
+      setStatus("PDF shared successfully.");
+    }else{
+      const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("PDF downloaded. You can share it from your device.");
+    }
+  }catch(error){if(error?.name!=="AbortError")showAppAlert("Could not share the PDF: "+(error?.message||String(error)));}
+}
+
 async function shareCurrentStockPdf(){
   const entries=Object.entries(businessData.inventory||{}).filter(([,row])=>Number(row.quantity)>0).sort(compareProductEntriesByName);
   if(!entries.length){showAppAlert("There is no stock quantity to share.");return;}
   if(!window.jspdf?.jsPDF){showAppAlert("PDF generator could not load. Check your internet connection and try again.");return;}
-  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();let y=18;
-  const line=(value,size=10,bold=false)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);const rows=doc.splitTextToSize(String(value??""),pw-28);if(y+rows.length*(size*.42+1)+5>ph-15){doc.addPage();y=18;}doc.text(rows,14,y);y+=rows.length*(size*.42+1)+5;};
-  doc.setProperties({title:"Current Stock",subject:"Product Scanner Vestige stock list",creator:"Product Scanner Vestige"});line("PRODUCT SCANNER VESTIGE",10,true);line("CURRENT STOCK",18,true);line("Products: "+entries.length,10,true);
-  entries.forEach(([key,row],index)=>line((index+1)+". "+row.product.name+" | Qty: "+Number(row.quantity)+" | DP: "+formatCartMoney(row.product.DP)+" | PV: "+Number(row.product.pv||0),10,false));
-  const filename="vestige-current-stock-"+new Date().toISOString().slice(0,10)+".pdf",blob=doc.output("blob"),file=new File([blob],filename,{type:"application/pdf"});
-  try{if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Current Stock",text:"Current stock from Product Scanner Vestige"});setStatus("Stock PDF shared successfully.");}else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("Stock PDF downloaded. You can share it from your device.");}}
-  catch(error){if(error?.name!=="AbortError")showAppAlert("Could not share the stock PDF: "+(error?.message||String(error)));}
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),pw=doc.internal.pageSize.getWidth();
+  const stamp=pdfDateStamp(),title="CURRENT STOCK",subtitle="As on "+pdfDisplayDate(new Date()),c=pdfPalette("stock");
+  doc.setProperties({title:"Vestige Current Stock",subject:"Current stock inventory report",creator:"Product Scanner Vestige"});
+  let y=pdfStartPage(doc,title,subtitle,"stock");
+  const totalQty=entries.reduce((sum,[,row])=>sum+Number(row.quantity||0),0);
+  const totalDP=entries.reduce((sum,[,row])=>sum+Number(row.product?.DP||0)*Number(row.quantity||0),0);
+  const totalPV=entries.reduce((sum,[,row])=>sum+Number(row.product?.pv||0)*Number(row.quantity||0),0);
+  y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:entries.length},{label:"TOTAL QUANTITY",value:totalQty},{label:"STOCK DP VALUE",value:historyPdfMoney(totalDP)},{label:"TOTAL PV",value:Number(totalPV.toFixed(2)).toLocaleString("en-IN")}],y,"stock");
+  y=pdfDrawTable(doc,[{label:"#",align:"left"},{label:"PRODUCT NAME"},{label:"QTY",align:"right"},{label:"DP (Rs.)",align:"right"},{label:"PV",align:"right"}],
+    entries.map(([key,row],i)=>[i+1,row.product?.name||"Unknown product",Number(row.quantity||0),Number(row.product?.DP||0).toFixed(2),Number(row.product?.pv||0).toLocaleString("en-IN")]),
+    y,{type:"stock",title,subtitle,widths:[10,86,23,34,29]});
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.setTextColor(105,119,109);doc.text("Product Scanner Vestige  •  Current Stock",14,289);doc.text("Page "+p+" of "+pages,pw-14,289,{align:"right"});}
+  const filename="Vestige_Current_Stock_"+stamp+".pdf";
+  await pdfShareOrDownload(doc,filename,"Current Stock","Current stock inventory from Product Scanner Vestige.");
 }
 function renderSalesOverview(){
   const now=new Date();let today=0,month=0;
@@ -3081,34 +3180,41 @@ async function shareHistoryPdf(type,id=null,range=null){
   if(!records.length){showAppAlert("No history records found for the selected date range.");return;}
   if(!window.jspdf?.jsPDF){showAppAlert("PDF generator could not load. Check your internet connection and try again.");return;}
   records.sort((a,b)=>(historyRecordDate(b,type)?.getTime()||0)-(historyRecordDate(a,type)?.getTime()||0));
-  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),left=14,right=14;let y=18;
-  const line=(value,size=9,bold=false,gap=4,color=[35,48,40])=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...color);const rows=doc.splitTextToSize(String(value??""),pw-left-right);if(y+rows.length*(size*.42+1)+gap>ph-15){doc.addPage();y=18;}doc.text(rows,left,y);y+=rows.length*(size*.42+1)+gap;};
-  const title=isSale?"Sale History":"Stock-in History";
-  doc.setProperties({title,subject:"Product Scanner Vestige history",creator:"Product Scanner Vestige"});
-  line("PRODUCT SCANNER VESTIGE",9,true,3,[22,122,69]);line(title,18,true,2);
-  line(range?"Date range: "+range.from+" to "+range.to:(id?"Individual record":"All records"),9,false,6,[90,100,93]);line("Records: "+records.length,10,true,7);
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),pw=doc.internal.pageSize.getWidth(),pdfType=isSale?"sale":"stock";
+  const title=isSale?"SALE HISTORY":"STOCK-IN HISTORY";
+  const subtitle=id?"Individual transaction":range?(range.from+" to "+range.to):"All saved records";
+  doc.setProperties({title:"Vestige "+(isSale?"Sale":"Stock-in")+" History",subject:"Product Scanner Vestige transaction history",creator:"Product Scanner Vestige"});
+  let y=pdfStartPage(doc,title,subtitle,pdfType);
+  const itemRows=[];
   records.forEach((r,index)=>{
     const d=historyRecordDate(r,type),stamp=d?d.toLocaleString("en-IN"):"Date unavailable";
-    line((index+1)+". "+(isSale?(r.customerName||"Sale"):(r.name||"Stock-in")),12,true,2);
-    line(stamp+(isSale?" | "+((r.saleType||"actual")==="record"?"Record Sale":"Actual Sale"):""),9,false,3,[90,100,93]);
-    (r.items||[]).forEach(item=>{
-      const name=item.product?.name||"Unknown product";
-      if(isSale)line("- "+name+" - Paid: "+Number(item.quantity||0)+", Free: "+Number(item.freeQuantity||0),9,false,2);
-      else line("- "+name+" - Quantity: "+Number(item.quantity||0)+", MRP: "+historyPdfMoney(item.product?.MRP)+", DP: "+historyPdfMoney(item.product?.DP)+", PV: "+Number(item.product?.pv||0),9,false,2);
-    });
-    if(isSale){line("Payment status: "+(r.paymentStatus==="paid"?"PAID":r.paymentStatus==="unpaid"?"UNPAID":"Not recorded"),9,true,2);line("Sale total: "+historyPdfMoney(r.total),10,true,4);}
-    else line("Stock-in totals - DP: "+historyPdfMoney(r.totalDP)+" | MRP: "+historyPdfMoney(r.totalMRP)+" | PV: "+Number(r.totalPV||0),10,true,4);
-    y+=3;
+    y=pdfDrawRecordHeading(doc,isSale?(r.customerName||"Sale #"+(index+1)):(r.name||"Stock-in #"+(index+1)),stamp,y,pdfType,title,subtitle);
+    const items=r.items||[];
+    if(isSale){
+      const rows=items.map(item=>[item.product?.name||"Unknown product",Number(item.quantity||0),Number(item.freeQuantity||0),historyPdfMoney(item.product?.DP),Number(item.product?.pv||0).toLocaleString("en-IN")]);
+      y=pdfDrawTable(doc,[{label:"PRODUCT NAME"},{label:"PAID",align:"right"},{label:"FREE",align:"right"},{label:"DP (Rs.)",align:"right"},{label:"PV",align:"right"}],rows,y,{type:pdfType,title,subtitle,widths:[91,19,19,29,24]});
+      const pv=items.reduce((sum,item)=>sum+Number(item.product?.pv||0)*Number(item.quantity||0),0);
+      y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:items.length},{label:"TOTAL UNITS",value:items.reduce((sum,item)=>sum+Number(item.quantity||0)+Number(item.freeQuantity||0),0)},{label:"SALE AMOUNT",value:historyPdfMoney(r.total)},{label:"TOTAL PV",value:Number(pv.toFixed(2)).toLocaleString("en-IN")}],y,pdfType);
+      const status=r.paymentStatus==="paid"?"PAID":r.paymentStatus==="unpaid"?"UNPAID":"NOT SPECIFIED";
+      y=pdfEnsureSpace(doc,y,12,title,subtitle,pdfType);
+      doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...(r.paymentStatus==="paid"?[22,125,65]:r.paymentStatus==="unpaid"?[174,76,48]:[83,96,87]));
+      doc.text("PAYMENT STATUS: "+status,16,y);doc.setFont("helvetica","normal");doc.setTextColor(80,91,83);doc.text("SALE TYPE: "+((r.saleType||"actual")==="record"?"RECORD SALE":"ACTUAL SALE"),pw-16,y,{align:"right"});y+=10;
+    }else{
+      const rows=items.map(item=>[item.product?.name||"Unknown product",Number(item.quantity||0),historyPdfMoney(Number(item.product?.MRP||0)*Number(item.quantity||0)),historyPdfMoney(Number(item.product?.DP||0)*Number(item.quantity||0)),Number((Number(item.product?.pv||0)*Number(item.quantity||0)).toFixed(2)).toLocaleString("en-IN")]);
+      y=pdfDrawTable(doc,[{label:"PRODUCT NAME"},{label:"QTY",align:"right"},{label:"MRP VALUE",align:"right"},{label:"DP VALUE",align:"right"},{label:"PV",align:"right"}],rows,y,{type:pdfType,title,subtitle,widths:[82,19,31,31,19]});
+      y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:items.length},{label:"TOTAL QUANTITY",value:items.reduce((sum,item)=>sum+Number(item.quantity||0),0)},{label:"TOTAL DP",value:historyPdfMoney(r.totalDP)},{label:"TOTAL PV",value:Number(r.totalPV||0).toLocaleString("en-IN")}],y,pdfType);
+    }
+    y=pdfEnsureSpace(doc,y,7,title,subtitle,pdfType);doc.setDrawColor(205,218,209);doc.line(14,y,pw-14,y);y+=8;
   });
-  const pages=doc.getNumberOfPages();for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(120);doc.text("Page "+p+" of "+pages,pw-right,ph-8,{align:"right"});}
-  const suffix=id?"record":range?range.from+"-to-"+range.to:"all",filename="vestige-"+(isSale?"sale":"stock-in")+"-history-"+suffix+".pdf";
-  const blob=doc.output("blob"),file=new File([blob],filename,{type:"application/pdf"});
-  try{
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title,text:title+" from Product Scanner Vestige"});setStatus("PDF shared successfully.");}
-    else{const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("PDF downloaded. You can share it from your device.");}
-  }catch(error){if(error?.name!=="AbortError")showAppAlert("Could not share the PDF: "+(error?.message||String(error)));}
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.setTextColor(105,119,109);doc.text("Product Scanner Vestige  •  "+(isSale?"Sale History":"Stock-in History"),14,289);doc.text("Page "+p+" of "+pages,pw-14,289,{align:"right"});}
+  let suffix;
+  if(id){const record=records[0],date=historyRecordDate(record,type)||new Date();suffix=pdfDateTimeStamp(date);}
+  else if(range)suffix=range.from+"_to_"+range.to;
+  else suffix="All_"+pdfDateStamp();
+  const filename="Vestige_"+(isSale?"Sale":"Stock_In")+(id?"_Record":"_History")+"_"+suffix+".pdf";
+  await pdfShareOrDownload(doc,filename,isSale?"Sale History":"Stock-in History",title+" from Product Scanner Vestige.");
 }
-
 async function handleSalesHistoryClick(event){const b=event.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="edit")await beginSaleEdit(id);if(b.dataset.saleAction==="delete")await deleteSale(id);}
 function exportBusinessBackup(){
   const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart,cartMode,carts:modeCarts},savedCarts};
