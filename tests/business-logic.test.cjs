@@ -230,12 +230,12 @@ test("Switching between Stock and Selling keeps independent carts without a clea
   x.context.cartMode = "selling";
   x.context.currentMode = "selling";
   x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  x.context.saveCartToStorage = () => { x.context.modeCarts[x.context.cartMode] = { cart: x.context.cart.map(item => ({ ...item })), cartName: x.context.cartName }; };
   x.context.setBusinessMode("stocking");
   assert.equal(x.context.cart.length, 0);
   assert.equal(x.context.cartMode, "stocking");
   assert.equal(x.context.modeCarts.selling.cart[0].quantity, 2);
   x.context.cart = [{ key: "stock-item", product: { ...assure, name: "Stock item" }, quantity: 4, freeQuantity: 0 }];
-  x.context.saveCartToStorage = () => { x.context.modeCarts.stocking = { cart: x.context.cart, cartName: x.context.cartName }; };
   x.context.setBusinessMode("selling");
   assert.equal(x.context.cart.length, 1);
   assert.equal(x.context.cart[0].quantity, 2);
