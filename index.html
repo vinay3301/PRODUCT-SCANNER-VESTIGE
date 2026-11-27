@@ -286,16 +286,12 @@ button:disabled {
   overflow-wrap:anywhere;
 }
 
-#addToCartBtn {
-  width:auto;
-  min-height:34px;
-  padding:7px 11px;
-  line-height:1.2;
-  font-size:12px;
-  border-radius:9px;
-  flex:none;
-  white-space:nowrap;
-}
+#addToCartBtn{width:auto;min-height:34px;padding:7px 11px;line-height:1.2;font-size:12px;border-radius:9px;flex:none;white-space:nowrap}
+#addToCartBtn.product-quantity-control{display:flex;align-items:center;gap:10px;padding:4px 8px;background:var(--control-bg);color:var(--text);border:1px solid var(--line)}
+#addToCartBtn.product-quantity-control span{display:grid;place-items:center;width:25px;height:25px;border-radius:7px;background:var(--button-bg);font-size:20px;line-height:1;cursor:pointer}
+#addToCartBtn.product-quantity-control strong{min-width:18px;text-align:center;font-size:15px}
+#saleStockPickerToggle{width:100%;text-align:left;background:var(--secondary-bg);color:var(--text);border:1px solid var(--line);min-height:44px}
+#saleStockResults{margin-top:7px}
 
 .add-button {
   background:var(--green);
@@ -1089,6 +1085,7 @@ let selectedProduct = null;
 
 let cart = [];
 let cartName = "";
+let modeCarts = {stocking:{cart:[],cartName:""},selling:{cart:[],cartName:""}};
 let savedCarts = [];
 let businessData = {schemaVersion:1,inventory:{},stockIns:[],sales:[]};
 let currentMode = "selling";
@@ -1445,10 +1442,8 @@ function saveCartToStorage() {
 
   try {
 
-    localStorage.setItem(
-      CART_STORAGE_KEY,
-      JSON.stringify({ cartName, cart, cartMode })
-    );
+    modeCarts[cartMode]={cart:cart.map(item=>({...item,product:{...item.product}})),cartName};
+    localStorage.setItem(CART_STORAGE_KEY,JSON.stringify({cartName,cart,cartMode,carts:modeCarts}));
 
     return true;
 
@@ -1483,39 +1478,19 @@ function normalizeCartItem(item) {
   };
 }
 
-function loadCartFromStorage() {
-
-  try {
-
-    const saved = localStorage.getItem(CART_STORAGE_KEY);
-
-    if (!saved) {
-      cart = [];
-      cartName = "";
-    } else {
-
-      const data = JSON.parse(saved);
-
-      cartName = String(data.cartName || "");
-
-      cart = Array.isArray(data.cart)
-        ? data.cart.map(normalizeCartItem).filter(Boolean)
-        : [];
-      cartMode = data.cartMode==="selling"?"selling":(data.cartMode==="stocking"?"stocking":(cart.length?"selling":currentMode));
+function loadCartFromStorage(){
+  try{
+    const saved=localStorage.getItem(CART_STORAGE_KEY);
+    if(!saved){cart=[];cartName="";cartMode=currentMode;modeCarts={stocking:{cart:[],cartName:""},selling:{cart:[],cartName:""}};}
+    else{
+      const data=JSON.parse(saved);cartMode=data.cartMode==="stocking"?"stocking":"selling";
+      const draft=d=>({cart:Array.isArray(d?.cart)?d.cart.map(normalizeCartItem).filter(Boolean):[],cartName:String(d?.cartName||"")});
+      modeCarts=data.carts&&typeof data.carts==="object"?{stocking:draft(data.carts.stocking),selling:draft(data.carts.selling)}:{stocking:{cart:[],cartName:""},selling:{cart:[],cartName:""}};
+      if(!data.carts)modeCarts[cartMode]=draft(data);
+      const active=modeCarts[cartMode];cart=active.cart.map(i=>({...i,product:{...i.product}}));cartName=active.cartName;
     }
-
-  } catch (error) {
-
-    console.warn("Could not restore cart:", error);
-
-    cart = [];
-    cartName = "";
-  }
-
-  $("cartName").value = cartName;
-  if(!cart.length)cartMode=currentMode;
-
-  renderCart();
+  }catch(error){console.warn("Could not restore cart:",error);cart=[];cartName="";modeCarts={stocking:{cart:[],cartName:""},selling:{cart:[],cartName:""}};}
+  $("cartName").value=cartName;renderCart();
 }
 
 // ==========================================
@@ -1577,6 +1552,16 @@ function getCartProductKey(product) {
 // ADD PRODUCT TO CART
 // ==========================================
 
+function renderProductCartControl(){
+  const button=$("addToCartBtn");if(!button||!selectedProduct)return;
+  const key=getCartProductKey(selectedProduct),item=cart.find(i=>i.key===key);
+  if(item){button.innerHTML='<span data-product-cart-action="decrease">−</span><strong>'+Number(item.quantity)+'</strong><span data-product-cart-action="increase">+</span>';button.classList.add("quantity-controls","product-quantity-control");}
+  else{button.classList.remove("quantity-controls","product-quantity-control");button.innerHTML="＋ Add to Cart";}
+}
+
+// ==========================================
+// ADD PRODUCT TO CART
+// ==========================================
 function addSelectedProductToCart() {
 
   if (!selectedProduct) return;
@@ -1620,7 +1605,7 @@ function addSelectedProductToCart() {
 
   const addedItem = cart.find(item => item.key === key);
 
-  $("addToCartBtn").textContent = "Added ✓";
+  renderProductCartControl();
 
   $("selectionNote").textContent =
     "✓ Added to cart. Current quantity: " +
@@ -2642,7 +2627,11 @@ $("cartName").addEventListener("input", () => {
   saveCartToStorage();
 });
 
-$("addToCartBtn").addEventListener("click",addSelectedProductToCart);
+$("addToCartBtn").addEventListener("click",event=>{
+  const action=event.target.closest("[data-product-cart-action]")?.dataset.productCartAction;
+  if(action){changeCartQuantity(getCartProductKey(selectedProduct),action==="increase"?1:-1);return;}
+  addSelectedProductToCart();
+});
 $("postTransactionBtn").addEventListener("click",postCurrentTransaction);
 $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
 $("sellingModeBtn").addEventListener("click",()=>setBusinessMode("selling"));
@@ -2759,7 +2748,7 @@ function setupSalesUI(){
   const shortageNotice=document.createElement("div");shortageNotice.id="stockShortageNotice";shortageNotice.className="business-muted hidden";shortageNotice.style.cssText="margin-top:9px;padding:10px;border-radius:9px;background:var(--danger-bg);color:var(--danger-text);font-weight:650";
   $("postTransactionBtn").insertAdjacentElement("afterend",shortageNotice);
   const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
-  controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><select id="saleProductSelect" aria-label="Select a product from available stock"><option value="">Select product from available stock</option></select><button type="button" class="primary" id="addStockProductBtn">ADD</button></div>';
+  controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><button type="button" class="secondary" id="saleStockPickerToggle" aria-expanded="false">Select products from available stock ▾</button><div id="saleStockResults" class="manual-search-results hidden" role="listbox" aria-label="Available stock products"></div></div>';
   $("cartName").insertAdjacentElement("afterend",controls);
   const oldCartActions=$("cartSection").querySelector(".cart-actions");if(oldCartActions)oldCartActions.remove();
   const savedSection=$("savedSection");if(savedSection)savedSection.remove();
@@ -2774,7 +2763,7 @@ function formatLocalDateTimeInput(value){
 }
 function normalizeBusinessData(data){
   const copy=JSON.parse(JSON.stringify(data));
-  copy.sales=(copy.sales||[]).map(s=>{const n={...s,saleType:s.saleType==="record"?"record":"actual",saleDate:s.saleDate||s.createdAt};delete n.payments;delete n.refunds;return n;});
+  copy.sales=(copy.sales||[]).map(s=>{const n={...s,saleType:s.saleType==="record"?"record":"actual",saleDate:s.saleDate||s.createdAt,paymentStatus:["paid","unpaid"].includes(s.paymentStatus)?s.paymentStatus:"unknown"};delete n.payments;delete n.refunds;return n;});
   return copy;
 }
 function validBusinessData(d){
@@ -2809,20 +2798,20 @@ function changeCartQuantity(key,change){
   item.quantity=Math.max(0,Number(item.quantity)+change);item.freeQuantity=Math.min(Number(item.freeQuantity)||0,item.quantity);
   if(item.quantity===0)cart=cart.filter(x=>x!==item);saveCartToStorage();renderCart();
 }
+function getAvailableStockForCart(key){return Math.max(0,getSaleStockLimit(key)-(Number(cart.find(i=>i.key===key)?.quantity)||0));}
 function renderSaleProductOptions(){
-  const select=$("saleProductSelect");if(!select)return;
-  const selected=select.value,rows=Object.entries(businessData.inventory||{}).filter(([,v])=>Number(v.quantity)>0).sort(compareProductEntriesByName);
-  select.innerHTML='<option value="">Select product from available stock</option>'+rows.map(([k,v])=>'<option value="'+escapeHtml(k)+'">'+escapeHtml(v.product.name)+' · Qty '+Number(v.quantity)+'</option>').join("");
-  if(rows.some(([k])=>k===selected))select.value=selected;$("addStockProductBtn").disabled=!rows.length;
+  const results=$("saleStockResults"),toggle=$("saleStockPickerToggle");if(!results||!toggle)return;
+  const rows=Object.entries(businessData.inventory||{}).sort(compareProductEntriesByName).map(([key,inv])=>({key,inv,available:getAvailableStockForCart(key)})).filter(x=>x.available>0);
+  results.innerHTML=rows.length?rows.map(({key,inv,available})=>'<button type="button" class="manual-search-result" role="option" data-sale-stock-key="'+escapeHtml(key)+'"><span class="manual-search-result-content"><span class="manual-search-product-name">'+escapeHtml(inv.product.name)+'</span><span class="manual-search-stock in-stock">In-stock · Qty '+available+'</span></span></button>').join(""):'<div class="manual-search-empty">No products are currently available in stock.</div>';
+  toggle.disabled=!rows.length;toggle.textContent="Select products from available stock ("+rows.length+") ▾";limitListTo(results,5,"contain");
 }
-function addStockProductToCart(){
-  const key=$("saleProductSelect").value;if(!key)return alert("Select a product first.");
-  const inv=businessData.inventory[key];if(!inv||Number(inv.quantity)<=0)return alert("This product is not currently available in stock.");
-  const old=cart.find(i=>i.key===key);
-  if(saleType==="actual"&&Number(old?.quantity||0)+1>getSaleStockLimit(key))return alert("No additional stock is available for "+inv.product.name+".");
+function addStockProductToCart(key){
+  if(!key)return alert("Select a product from the available stock list.");
+  const inv=businessData.inventory[key],available=getAvailableStockForCart(key);
+  if(!inv||available<=0){alert((inv?.product?.name||"This product")+" isn't available to add.");renderSaleProductOptions();return;}
   if(cartMode!=="selling")return alert("Switch to Selling before adding products to the SALE CART.");
-  if(old)old.quantity+=1;else cart.push({key,product:{...inv.product},quantity:1,freeQuantity:0,quantityIncludesFree:true});
-  saveCartToStorage();renderCart();$("saleProductSelect").value="";setStatus("Added "+inv.product.name+" to the sale cart.");
+  const old=cart.find(i=>i.key===key);if(old)old.quantity+=1;else cart.push({key,product:{...inv.product},quantity:1,freeQuantity:0,quantityIncludesFree:true});
+  saveCartToStorage();renderCart();renderSaleProductOptions();setStatus("Added "+inv.product.name+" to the sale cart. Remaining available: "+getAvailableStockForCart(key)+".");
 }
 function limitListTo(el,visibleCount,overscrollBehavior="contain"){
   if(!el)return;
@@ -2884,8 +2873,12 @@ function setSaleType(type){
 }
 function setBusinessMode(mode){
   const requested=mode==="selling"?"selling":"stocking";
-  if(requested!==currentMode&&!cart.length){cartMode=requested;saveCartToStorage();}
-  currentMode=requested;
+  if(requested!==currentMode){
+    saveCartToStorage();currentMode=requested;cartMode=requested;
+    const draft=modeCarts[requested]||{cart:[],cartName:""};
+    cart=draft.cart.map(i=>({...i,product:{...i.product}}));cartName=draft.cartName||"";
+    $("cartName").value=cartName;saveCartToStorage();
+  }else{currentMode=requested;cartMode=requested;}
   $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
   $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");$("salesHistorySection").classList.toggle("hidden",currentMode!=="selling");
   const isSaleCart=cartMode==="selling";
@@ -2898,6 +2891,7 @@ function setBusinessMode(mode){
 }
 function renderCart(){
   legacyRenderCart();
+  renderProductCartControl();
   const isSaleCart=cartMode==="selling";
   $("cartSection").querySelector("h2").textContent=isSaleCart?"SALE CART":"STOCK-IN CART";
   $("saleTypeToggle").classList.toggle("hidden",!isSaleCart);
@@ -2922,6 +2916,7 @@ function postSale(){
   if(oldSale&&Date.now()-new Date(oldSale.createdAt).getTime()>7*86400000){alert("Sales can only be edited within 7 days of the original sale.");return;}
   const saleDate=selectedSaleDate();if(!saleDate){alert("Choose a valid date and time for this Record Sale.");return;}
   for(const item of items)if((Number(item.freeQuantity)||0)>Number(item.quantity)){alert("Free quantity cannot exceed total quantity for "+item.product.name+".");return;}
+  const paymentStatus=confirm("Has this sale been paid?\n\nOK = PAID\nCancel = UNPAID")?"paid":"unpaid";
   const now=new Date().toISOString(),next=JSON.parse(JSON.stringify(businessData)),sale=editingSaleId?next.sales.find(s=>s.id===editingSaleId):null;
   const oldItems=sale?sale.items||[]:[],oldType=oldSale?.saleType||"actual";
   const newItems=items.map(item=>({...productSnapshot(item),quantity:Math.max(0,Number(item.quantity)-(Number(item.freeQuantity)||0)),freeQuantity:Number(item.freeQuantity)||0}));
@@ -2935,8 +2930,8 @@ function postSale(){
     if(old||fresh||next.inventory[key])next.inventory[key]={product:fresh?.product||old?.product||next.inventory[key]?.product,quantity:adjusted,updatedAt:now};
   }
   const total=saleTotal(newItems);
-  if(!sale)next.sales.unshift({id:makeRecordId(),createdAt:now,saleDate,saleType,customerName:cartName.trim(),items:newItems,total,revisions:[]});
-  else{sale.revisions=Array.isArray(sale.revisions)?sale.revisions:[];sale.revisions.push({revisedAt:now,previousTotal:sale.total,previousItems:JSON.parse(JSON.stringify(sale.items)),previousSaleType:oldType,previousSaleDate:sale.saleDate||sale.createdAt});sale.items=newItems;sale.total=total;sale.saleType=saleType;sale.saleDate=saleDate;sale.updatedAt=now;sale.customerName=cartName.trim()||sale.customerName||"";delete sale.payments;delete sale.refunds;}
+  if(!sale)next.sales.unshift({id:makeRecordId(),createdAt:now,saleDate,saleType,paymentStatus,customerName:cartName.trim(),items:newItems,total,revisions:[]});
+  else{sale.revisions=Array.isArray(sale.revisions)?sale.revisions:[];sale.revisions.push({revisedAt:now,previousTotal:sale.total,previousItems:JSON.parse(JSON.stringify(sale.items)),previousSaleType:oldType,previousSaleDate:sale.saleDate||sale.createdAt});sale.items=newItems;sale.total=total;sale.saleType=saleType;sale.paymentStatus=paymentStatus;sale.saleDate=saleDate;sale.updatedAt=now;sale.customerName=cartName.trim()||sale.customerName||"";delete sale.payments;delete sale.refunds;}
   if(!saveBusinessData(next))return;
   const savedType=saleType;editingSaleId=null;cart=[];cartName="";cartMode=currentMode;$("cartName").value="";saleType="actual";$("saleDateInput").value=formatLocalDateTimeInput(new Date());saveCartToStorage();renderCart();renderInventory();renderSalesHistory();renderSalesOverview();
   setStatus(savedType==="actual"?"Actual Sale saved. Stock has been deducted.":"Record Sale saved. Stock was not changed.");
@@ -2952,6 +2947,12 @@ function deleteSale(id){
 }
 function renderSalesHistory(){
   const el=$("salesHistoryList"),records=[...(businessData.sales||[])].sort((a,b)=>new Date(b.saleDate||b.createdAt).getTime()-new Date(a.saleDate||a.createdAt).getTime());
+  const unpaidCount=records.filter(record=>record.paymentStatus==="unpaid").length;
+  let unpaidButton=$("unpaidSalesFilterBtn");
+  if(!unpaidButton){unpaidButton=document.createElement("button");unpaidButton.type="button";unpaidButton.id="unpaidSalesFilterBtn";unpaidButton.className="secondary";unpaidButton.style.cssText="width:100%;margin:0 0 8px;background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)";}
+  unpaidButton.textContent="UNPAID SALES: "+unpaidCount;unpaidButton.dataset.filter="all";
+  if(unpaidCount>0){unpaidButton.classList.remove("hidden");if(unpaidButton.parentElement!==el.parentElement)el.parentElement.insertBefore(unpaidButton,el);}else unpaidButton.remove();
+  unpaidButton.onclick=()=>{const only=unpaidButton.dataset.filter!=="unpaid";unpaidButton.dataset.filter=only?"unpaid":"all";unpaidButton.textContent=(only?"SHOWING UNPAID: ":"UNPAID SALES: ")+unpaidCount;el.querySelectorAll(".history-card").forEach(card=>card.classList.toggle("hidden",only&&card.dataset.paymentStatus!=="unpaid"));};
   el.innerHTML=records.length?records.map((r,index)=>{
     const d=new Date(r.saleDate||r.createdAt),canEdit=Date.now()-new Date(r.createdAt).getTime()<=7*86400000;
     const items=r.items||[],qty=items.reduce((sum,i)=>sum+Number(i.quantity||0)+Number(i.freeQuantity||0),0);
@@ -2960,7 +2961,7 @@ function renderSalesHistory(){
     const lines=items.map(i=>escapeHtml(i.product.name)+" · paid "+Number(i.quantity||0)+" · free "+Number(i.freeQuantity||0)).join("<br>");
     const revisions=(r.revisions||[]).map(v=>"Sale edited "+escapeHtml(new Date(v.revisedAt).toLocaleString("en-IN"))+" · previous total "+formatCartMoney(v.previousTotal)).join("<br>");
     const stamp=Number.isNaN(d.getTime())?"":d.toLocaleString("en-IN"),detailsId="sale-history-details-"+index;
-    return '<article class="history-card"><button type="button" class="history-summary-toggle" data-history-toggle aria-expanded="false" aria-controls="'+detailsId+'"><span><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(stamp)+' · '+type+'</small><small>'+items.length+' product types · '+qty+' total quantity · Amount sold: '+formatCartMoney(r.total)+' · Total PV: '+pv.toLocaleString("en-IN",{maximumFractionDigits:2})+'</small>'+(revisions?'<small>'+revisions+'</small>':'')+'</span><span class="history-chevron" aria-hidden="true">＋</span></button><div class="history-detail" id="'+detailsId+'" hidden>'+lines+'</div><button type="button" class="secondary history-share-button" data-history-share="sale" data-history-id="'+escapeHtml(r.id)+'">Share this Sale PDF</button><div class="business-actions">'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / Return</button>':'')+'<button class="danger-action" data-sale-action="delete" data-sale-id="'+escapeHtml(r.id)+'">Delete</button></div></article>';
+    return '<article class="history-card" data-payment-status="'+(r.paymentStatus||"unknown")+'"><button type="button" class="history-summary-toggle" data-history-toggle aria-expanded="false" aria-controls="'+detailsId+'"><span><strong>'+escapeHtml(r.customerName||"Sale")+'</strong><small>'+escapeHtml(stamp)+' · '+type+' · Payment: '+(r.paymentStatus==="paid"?"PAID":r.paymentStatus==="unpaid"?"UNPAID":"Not recorded")+'</small><small>'+items.length+' product types · '+qty+' total quantity · Amount sold: '+formatCartMoney(r.total)+' · Total PV: '+pv.toLocaleString("en-IN",{maximumFractionDigits:2})+'</small>'+(revisions?'<small>'+revisions+'</small>':'')+'</span><span class="history-chevron" aria-hidden="true">＋</span></button><div class="history-detail" id="'+detailsId+'" hidden>'+lines+'</div><button type="button" class="secondary history-share-button" data-history-share="sale" data-history-id="'+escapeHtml(r.id)+'">Share this Sale PDF</button><div class="business-actions">'+(canEdit?'<button data-sale-action="edit" data-sale-id="'+escapeHtml(r.id)+'">Edit / Return</button>':'')+'<button class="danger-action" data-sale-action="delete" data-sale-id="'+escapeHtml(r.id)+'">Delete</button></div></article>';
   }).join(""):'<div class="business-muted">No sales recorded yet.</div>';
   limitListTo(el,5,"auto");
 }
@@ -3010,7 +3011,7 @@ async function shareHistoryPdf(type,id=null,range=null){
       if(isSale)line("- "+name+" - Paid: "+Number(item.quantity||0)+", Free: "+Number(item.freeQuantity||0),9,false,2);
       else line("- "+name+" - Quantity: "+Number(item.quantity||0)+", MRP: "+historyPdfMoney(item.product?.MRP)+", DP: "+historyPdfMoney(item.product?.DP)+", PV: "+Number(item.product?.pv||0),9,false,2);
     });
-    if(isSale)line("Sale total: "+historyPdfMoney(r.total),10,true,4);
+    if(isSale){line("Payment status: "+(r.paymentStatus==="paid"?"PAID":r.paymentStatus==="unpaid"?"UNPAID":"Not recorded"),9,true,2);line("Sale total: "+historyPdfMoney(r.total),10,true,4);}
     else line("Stock-in totals - DP: "+historyPdfMoney(r.totalDP)+" | MRP: "+historyPdfMoney(r.totalMRP)+" | PV: "+Number(r.totalPV||0),10,true,4);
     y+=3;
   });
@@ -3043,7 +3044,9 @@ async function importBusinessBackup(event){
 function initializeBusinessFeatures(){
   loadBusinessData();$("salesHistoryList").addEventListener("click",handleSalesHistoryClick);
   $("actualSaleBtn").addEventListener("click",()=>setSaleType("actual"));$("recordSaleBtn").addEventListener("click",()=>setSaleType("record"));
-  $("addStockProductBtn").addEventListener("click",addStockProductToCart);$("saleDateInput").value=formatLocalDateTimeInput(new Date());
+  $("saleStockPickerToggle").addEventListener("click",()=>{const results=$("saleStockResults"),opening=results.classList.contains("hidden");results.classList.toggle("hidden",!opening);$("saleStockPickerToggle").setAttribute("aria-expanded",String(opening));if(opening)renderSaleProductOptions();});
+  $("saleStockResults").addEventListener("click",event=>{const button=event.target.closest("button[data-sale-stock-key]");if(button)addStockProductToCart(button.dataset.saleStockKey);});
+  $("saleDateInput").value=formatLocalDateTimeInput(new Date());
   $("stockList").addEventListener("click",event=>{const button=event.target.closest("button[data-stock-key]");if(button)adjustStockQuantity(button.dataset.stockKey,Number(button.dataset.stockDelta));});
   $("clearStockBtn").addEventListener("click",clearAllStock);
   setBusinessMode(cart.length ? cartMode : "selling");renderStockHistory();renderSalesHistory();renderSalesOverview();
@@ -3248,7 +3251,7 @@ function selectProduct(item, automatic = false, source = "scan") {
   $("selectionNote").classList.remove("hidden");
 
   $("addToCartBtn").classList.remove("hidden");
-  $("addToCartBtn").textContent = "＋ Add to Cart";
+  renderProductCartControl();
 
   if (stream) {
     $("scanAgainBtn").classList.remove("hidden");
