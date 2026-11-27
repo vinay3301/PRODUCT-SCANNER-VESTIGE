@@ -37,7 +37,7 @@ function createHarness() {
   }
   const context = {
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
-    cart: [], cartName: "", savedCarts: [], currentMode: "stocking",
+    cart: [], cartName: "", modeCarts: { stocking: { cart: [], cartName: "" }, selling: { cart: [], cartName: "" } }, savedCarts: [], currentMode: "stocking",
     editingSaleId: null, transactionBusy: false, saleType: "actual", cartMode: "stocking",
     BUSINESS_STORAGE_KEY: "test-business", CART_STORAGE_KEY: "test-cart", SAVED_CARTS_STORAGE_KEY: "test-saved",
     $, localStorage: {
@@ -224,18 +224,24 @@ test("Clear Stock resets quantities but retains product catalogue and sale histo
   assert.equal(x.context.businessData.sales.length, 1);
 });
 
-test("Switching between Stock and Selling preserves the active cart without a clear-cart prompt", () => {
+test("Switching between Stock and Selling keeps independent carts without a clear-cart prompt", () => {
   const x = createHarness();
   seedStock(x, k1, assure, 5);
   x.context.cartMode = "selling";
   x.context.currentMode = "selling";
   x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
   x.context.setBusinessMode("stocking");
-  assert.equal(x.context.cart.length, 1);
-  assert.equal(x.context.cartMode, "selling");
+  assert.equal(x.context.cart.length, 0);
+  assert.equal(x.context.cartMode, "stocking");
+  assert.equal(x.context.modeCarts.selling.cart[0].quantity, 2);
+  x.context.cart = [{ key: "stock-item", product: { ...assure, name: "Stock item" }, quantity: 4, freeQuantity: 0 }];
+  x.context.saveCartToStorage = () => { x.context.modeCarts.stocking = { cart: x.context.cart, cartName: x.context.cartName }; };
   x.context.setBusinessMode("selling");
   assert.equal(x.context.cart.length, 1);
   assert.equal(x.context.cart[0].quantity, 2);
+  x.context.setBusinessMode("stocking");
+  assert.equal(x.context.cart.length, 1);
+  assert.equal(x.context.cart[0].quantity, 4);
   assert.equal(x.alerts.length, 0);
 });
 
@@ -337,7 +343,7 @@ test("Daily and monthly totals include both sale types and use recorded sale dat
   assert.equal(x.$("salesTodayValue").textContent, "₹100.00");
 });
 
-test("Sale history shows type, total quantity, amount and PV without payment fields", () => {
+test("Sale history shows type, payment status, total quantity, amount and PV", () => {
   const x = createHarness();
   addSale(x, "record", 3, 1);
   x.context.renderSalesHistory();
@@ -346,7 +352,7 @@ test("Sale history shows type, total quantity, amount and PV without payment fie
   assert.match(htmlOut, /3 total quantity/);
   assert.match(htmlOut, /Amount sold:/);
   assert.match(htmlOut, /Total PV:/);
-  assert.doesNotMatch(htmlOut, /Unpaid|Partially paid|Paid|Payment|Refund|Balance/);
+  assert.match(htmlOut, /Payment: PAID/);
 });
 
 test("Seven-day edit restriction is retained", () => {
