@@ -35,7 +35,13 @@ function createHarness() {
     }
     return elements.get(id);
   }
+  const fakeDocument = {
+    createElement: tag => ({ tagName: tag, id: "", hidden: false, dataset: {}, addEventListener: (name, fn) => { fakeDocument.listeners.set("created:" + name, fn); } }),
+    body: { appendChild: el => elements.set(el.id, el) },
+    listeners: new Map()
+  };
   const context = {
+    document: fakeDocument,
     businessData: { schemaVersion: 1, inventory: {}, stockIns: [], sales: [] },
     cart: [], cartName: "", modeCarts: { stocking: { cart: [], cartName: "" }, selling: { cart: [], cartName: "" } }, savedCarts: [], currentMode: "stocking",
     editingSaleId: null, transactionBusy: false, saleType: "actual", cartMode: "stocking",
@@ -524,14 +530,22 @@ test("Sale checkout records paid or unpaid status", () => {
   paid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
   paid.context.confirm = () => true;
   paid.context.postSale();
+  paid.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "paid" } }) } });
   assert.equal(paid.context.businessData.sales[0].paymentStatus, "paid");
 
   const unpaid = createHarness();
   seedStock(unpaid, k1, assure, 5);
   unpaid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
-  unpaid.context.confirm = () => false;
   unpaid.context.postSale();
+  unpaid.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "unpaid" } }) } });
   assert.equal(unpaid.context.businessData.sales[0].paymentStatus, "unpaid");
+
+  const unspecified = createHarness();
+  seedStock(unspecified, k1, assure, 5);
+  unspecified.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  unspecified.context.postSale();
+  unspecified.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "unknown" } }) } });
+  assert.equal(unspecified.context.businessData.sales[0].paymentStatus, "unknown");
 });
 
 test("Legacy sales keep payment status unknown rather than being marked paid or unpaid", () => {
@@ -547,7 +561,12 @@ test("Sale UI uses product-style available-stock rows and an unpaid-sales counte
   assert.match(html, /id="saleStockPickerToggle"/);
   assert.match(html, /id="saleStockResults"/);
   assert.match(html, /class="manual-search-result"[^>]*role="option" data-sale-stock-key/);
+  assert.match(html, /stock-picker-panel/);
+  assert.match(html, /#saleStockResults \.manual-search-result/);
   assert.match(html, /isn't available to add/);
+  assert.match(html, /data-payment-choice="unknown">NOT SPECIFIED/);
+  assert.match(html, /sale-payment-panel/);
+  assert.doesNotMatch(html, /confirm\("Has this sale been paid/);
   assert.match(html, /id="unpaidSalesFilterBtn"/);
   assert.match(html, /UNPAID SALES:/);
   assert.match(html, /Payment: /);
