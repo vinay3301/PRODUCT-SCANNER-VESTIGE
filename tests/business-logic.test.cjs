@@ -589,6 +589,7 @@ test("Selling mode keeps product fields visible and opens Sale History from the 
   assert.match(html, /\$\("productListSection"\)\.classList\.remove\("hidden"\)/);
   assert.match(html, /history\.classList\.toggle\("hidden",!showHistory\)/);
   assert.match(html, /saleHistoryToggleBtn.*SHOW SALE HISTORY/);
+  assert.match(html, /saleHistoryToggleBtn"\)\.classList\.toggle\("hidden",currentMode!=="selling"\)/);
   assert.match(html, /section\.id="salesHistorySection";section\.className="sale-history-section hidden"/);
 });
 
