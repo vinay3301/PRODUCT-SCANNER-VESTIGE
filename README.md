@@ -2,8 +2,8 @@
 
 A mobile-friendly, browser-based Vestige product and dealer sales manager. The application supports two ways to find products: live catalogue search and camera-based OCR scanning. It combines product pricing, local dealer inventory, stock-in, and sales workflows.
 
-**Live application:** https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/  
-**Source repository:** https://github.com/vinay3301/PRODUCT-SCANNER-VESTIGE
+**Live application:** https://vinay3301.github.io/VESTIGE-DEALER-SALES-STOCK-MANAGER/  
+**Source repository:** https://github.com/vinay3301/VESTIGE-DEALER-SALES-STOCK-MANAGER
 
 ---
 
@@ -67,7 +67,7 @@ Stock quantities, stock-in records, sales records, and the active cart are store
 
 ## Getting started
 
-1. Open the [live application](https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/) in a modern browser.
+1. Open the [live application](https://vinay3301.github.io/VESTIGE-DEALER-SALES-STOCK-MANAGER/) in a modern browser.
 2. Wait for the product-count/API badge in the header to show that products have loaded.
 3. Find a product by typing in the manual catalogue search, or press **SCAN** to reveal the camera scanner and then press **Start camera**.
 4. The application opens in **Selling** mode when there is no unfinished cart. Choose **Stock** when entering stock received.
@@ -322,7 +322,7 @@ Keep companion files referenced by the HTML in the repository. The Cloudflare Wo
 
 GitHub Pages serves the application at:
 
-https://vinay3301.github.io/PRODUCT-SCANNER-VESTIGE/
+https://vinay3301.github.io/VESTIGE-DEALER-SALES-STOCK-MANAGER/
 
 ### Updating the frontend
 
