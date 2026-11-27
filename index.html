@@ -2729,7 +2729,7 @@ function setupSalesUI(){
   const history=$("salesHistoryList") || document.createElement("div");
   history.id="salesHistoryList";history.classList.remove("hidden");
   const section=document.createElement("section");
-  section.id="salesHistorySection";section.className="sale-history-section hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div><div class="history-export-actions"><button type="button" class="secondary" id="shareSaleHistoryBtn">Share Sale History PDF</button></div>';
+  section.id="salesHistorySection";section.className="sale-history-section hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div><button type="button" class="secondary hidden" id="unpaidSalesFilterBtn" style="width:100%;margin:0 0 8px;background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)">UNPAID SALES: 0</button><div class="history-export-actions"><button type="button" class="secondary" id="shareSaleHistoryBtn">Share Sale History PDF</button></div>';
   history.classList.add("sale-history-list");section.appendChild(history);
   const checkout=$("postTransactionBtn"),actions=document.createElement("div");actions.className="sale-checkout-actions";
   const clearButton=document.createElement("button");clearButton.type="button";clearButton.id="clearSaleCartBtn";clearButton.className="clear-sale-cart-btn";clearButton.textContent="CLEAR SALE CART";
@@ -2948,10 +2948,9 @@ function deleteSale(id){
 function renderSalesHistory(){
   const el=$("salesHistoryList"),records=[...(businessData.sales||[])].sort((a,b)=>new Date(b.saleDate||b.createdAt).getTime()-new Date(a.saleDate||a.createdAt).getTime());
   const unpaidCount=records.filter(record=>record.paymentStatus==="unpaid").length;
-  let unpaidButton=$("unpaidSalesFilterBtn");
-  if(!unpaidButton){unpaidButton=document.createElement("button");unpaidButton.type="button";unpaidButton.id="unpaidSalesFilterBtn";unpaidButton.className="secondary";unpaidButton.style.cssText="width:100%;margin:0 0 8px;background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)";}
+  const unpaidButton=$("unpaidSalesFilterBtn");
   unpaidButton.textContent="UNPAID SALES: "+unpaidCount;unpaidButton.dataset.filter="all";
-  if(unpaidCount>0){unpaidButton.classList.remove("hidden");if(unpaidButton.parentElement!==el.parentElement)el.parentElement.insertBefore(unpaidButton,el);}else unpaidButton.remove();
+  unpaidButton.classList.toggle("hidden",unpaidCount===0);
   unpaidButton.onclick=()=>{const only=unpaidButton.dataset.filter!=="unpaid";unpaidButton.dataset.filter=only?"unpaid":"all";unpaidButton.textContent=(only?"SHOWING UNPAID: ":"UNPAID SALES: ")+unpaidCount;el.querySelectorAll(".history-card").forEach(card=>card.classList.toggle("hidden",only&&card.dataset.paymentStatus!=="unpaid"));};
   el.innerHTML=records.length?records.map((r,index)=>{
     const d=new Date(r.saleDate||r.createdAt),canEdit=Date.now()-new Date(r.createdAt).getTime()<=7*86400000;
