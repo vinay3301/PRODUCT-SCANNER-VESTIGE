@@ -573,7 +573,7 @@ test("Selling mode starts on Product List and opens Sale History only when selec
   assert.match(html, /class="selling-view-nav business-actions hidden" id="sellingViewNav"/);
   assert.match(html, /id="showProductListBtn" class="active">PRODUCT LIST/);
   assert.match(html, /id="showSaleHistoryBtn">SALE HISTORY/);
-  assert.match(html, /id="salesHistorySection" class="sale-history-section hidden"/);
+  assert.match(html, /section\.id="salesHistorySection";section\.className="sale-history-section hidden"/);
   assert.match(html, /function showSellingView\(view\)/);
   assert.match(html, /\$\("productListSection"\)\.classList\.toggle\("hidden",showHistory\)/);
   assert.match(html, /\$\("salesHistorySection"\)\.classList\.toggle\("hidden",!showHistory\)/);
