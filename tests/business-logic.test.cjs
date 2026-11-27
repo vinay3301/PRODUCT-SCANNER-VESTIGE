@@ -361,7 +361,7 @@ test("Seven-day edit restriction is retained", () => {
 });
 
 
-test("Sale cart uses compact sale-type toggle, checkout wording, and manual stock controls", () => {
+test("Sale cart uses compact sale-type toggle, checkout wording, and no direct stock controls", () => {
   assert.match(html, /SALE CART/);
   assert.match(html, /sale-type-toggle/);
   assert.match(html, /CHECK OUT ACTUAL SALE/);
@@ -755,11 +755,11 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ]);
 });
 
-test("Dynamically-created Sale History controls are attached before their listeners are bound", () => {
-  const sectionInsert = html.indexOf('actions.insertAdjacentElement("afterend",section)');
+test("Dynamically-created Sale History controls are attached after selling navigation before listeners bind", () => {
+  const sectionInsert = html.indexOf('$("sellingViewNav").insertAdjacentElement("afterend",section)');
   const saleShareListener = html.indexOf('$("shareSaleHistoryBtn").addEventListener');
   const stockShareListener = html.indexOf('$("shareStockHistoryBtn").addEventListener');
-  assert.ok(sectionInsert >= 0, "Sale History section must be inserted into the document");
+  assert.ok(sectionInsert >= 0, "Sale History section must be inserted below the Selling navigation");
   assert.ok(saleShareListener > sectionInsert, "Sale History share button listener must be bound after insertion");
   assert.ok(stockShareListener > sectionInsert, "Stock-in share button listener must be bound after insertion");
 });
