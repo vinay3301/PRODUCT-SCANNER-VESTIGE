@@ -2788,7 +2788,7 @@ function getSaleStockLimit(key){
 function addSelectedProductToCart(){
   if(!selectedProduct)return;
   const p=selectedProduct,key=getCartProductKey(p),old=cart.find(i=>i.key===key);if(!key)return;
-  if(cartMode==="selling"&&saleType==="actual"&&(Number(old?.quantity)||0)+1>getSaleStockLimit(key)){alert("No additional stock is available for "+p.name+".");return;}
+  if(cartMode==="selling"&&(Number(old?.quantity)||0)+1>getSaleStockLimit(key)){alert("No additional stock is available for "+p.name+".");return;}
   if(old)old.quantity+=1;else cart.push({key,product:{name:p.name,MRP:p.MRP,DP:p.DP,pv:p.pv},quantity:1,freeQuantity:0,quantityIncludesFree:true});
   saveCartToStorage();renderCart();setStatus("Added to cart: "+p.name+".");
 }
@@ -2901,6 +2901,7 @@ function renderCart(){
   $("actualSaleBtn").setAttribute("aria-checked",String(saleType==="actual"));$("recordSaleBtn").setAttribute("aria-checked",String(saleType==="record"));
   $("saleDateField").classList.toggle("hidden",saleType!=="record");
   updateCheckoutButton();
+  renderSaleProductOptions();
 }
 
 function selectedSaleDate(){
