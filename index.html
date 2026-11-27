@@ -1005,7 +1005,7 @@ button:disabled {
       </div>
     </div>
 
-    <div class="business-actions" style="margin-top:14px"><button class="primary" id="postTransactionBtn" type="button" disabled style="width:100%">SAVE STOCK-IN</button></div>
+    <div class="business-actions" style="margin-top:14px"><button class="primary" id="postTransactionBtn" type="button" disabled style="width:100%">ADD STOCK-IN</button></div>
 
     <div class="business-list hidden" id="salesHistoryList"></div>
 
@@ -1967,7 +1967,7 @@ function legacyRenderCart() {
   $("cartSummary").classList.toggle("hidden", !hasItems);
 
   $("postTransactionBtn").disabled = !hasItems || transactionBusy;
-  $("postTransactionBtn").textContent = cartMode==="stocking" ? "SAVE STOCK-IN" : (editingSaleId ? "UPDATE SALE" : (saleType==="record" ? "CHECK OUT RECORD SALE" : "CHECK OUT ACTUAL SALE"));
+  $("postTransactionBtn").textContent = cartMode==="stocking" ? "ADD STOCK-IN" : (editingSaleId ? "UPDATE SALE" : (saleType==="record" ? "CHECK OUT RECORD SALE" : "CHECK OUT ACTUAL SALE"));
 
   $("cartCount").textContent =
     totals.totalQuantity +
@@ -2778,7 +2778,7 @@ function setupSalesUI(){
   section.id="salesHistorySection";section.className="sale-history-section hidden";section.innerHTML='<div class="sale-history-heading"><h3>Sale History</h3></div><button type="button" class="secondary hidden" id="unpaidSalesFilterBtn" style="width:100%;margin:0 0 8px;background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)">UNPAID SALES: 0</button><div class="history-export-actions"><button type="button" class="secondary" id="shareSaleHistoryBtn">Share Sale History PDF</button></div>';
   history.classList.add("sale-history-list");section.appendChild(history);
   const checkout=$("postTransactionBtn"),actions=document.createElement("div");actions.className="sale-checkout-actions";
-  const clearButton=document.createElement("button");clearButton.type="button";clearButton.id="clearSaleCartBtn";clearButton.className="clear-sale-cart-btn";clearButton.textContent="CLEAR SALE CART";
+  const clearButton=document.createElement("button");clearButton.type="button";clearButton.id="clearSaleCartBtn";clearButton.className="clear-sale-cart-btn";clearButton.textContent="CLEAR CART";
   checkout.textContent="CHECK OUT SALE";checkout.parentElement.replaceWith(actions);actions.append(checkout,clearButton);
   const historyToggle=document.createElement("button");historyToggle.type="button";historyToggle.id="saleHistoryToggleBtn";historyToggle.className="secondary sale-history-toggle-btn";historyToggle.textContent="SHOW SALE HISTORY";historyToggle.style.cssText="width:100%;min-height:42px;margin-top:9px";
   $("cartSection").appendChild(historyToggle);$("cartSection").insertAdjacentElement("afterend",section);
@@ -2796,7 +2796,7 @@ function setupSalesUI(){
   const shortageNotice=document.createElement("div");shortageNotice.id="stockShortageNotice";shortageNotice.className="business-muted hidden";shortageNotice.style.cssText="margin-top:9px;padding:10px;border-radius:9px;background:var(--danger-bg);color:var(--danger-text);font-weight:650";
   $("postTransactionBtn").insertAdjacentElement("afterend",shortageNotice);
   const controls=document.createElement("div");controls.id="saleControls";controls.className="hidden";
-  controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><div class="stock-picker-panel"><button type="button" id="saleStockPickerToggle" aria-expanded="false" aria-controls="saleStockResults"><span class="stock-picker-label"><span class="stock-picker-icon" aria-hidden="true">⌕</span><span>Select products from available stock</span></span><span class="stock-picker-chevron" aria-hidden="true">⌄</span></button><div id="saleStockResults" class="hidden" role="listbox" aria-label="Available stock products"></div></div></div>';
+  controls.innerHTML='<div class="sales-overview"><div class="business-stat"><small>Total sale today</small><strong id="salesTodayValue">₹0.00</strong></div><div class="business-stat"><small>Total sale this month</small><strong id="salesMonthValue">₹0.00</strong></div></div><div class="sale-date-field hidden" id="saleDateField"><label for="saleDateInput">Record Sale date and time</label><input type="datetime-local" id="saleDateInput"></div><div class="sale-product-picker"><div class="stock-picker-panel"><button type="button" id="saleStockPickerToggle" aria-expanded="false" aria-controls="saleStockResults"><span class="stock-picker-label"><span class="stock-picker-icon" aria-hidden="true">⌕</span><span>Select from available stock</span></span><span class="stock-picker-chevron" aria-hidden="true">⌄</span></button><div id="saleStockResults" class="hidden" role="listbox" aria-label="Available stock products"></div></div></div>';
   $("cartName").insertAdjacentElement("afterend",controls);
   const oldCartActions=$("cartSection").querySelector(".cart-actions");if(oldCartActions)oldCartActions.remove();
   const savedSection=$("savedSection");if(savedSection)savedSection.remove();
@@ -2851,7 +2851,7 @@ function renderSaleProductOptions(){
   const results=$("saleStockResults"),toggle=$("saleStockPickerToggle");if(!results||!toggle)return;
   const rows=Object.entries(businessData.inventory||{}).sort(compareProductEntriesByName).map(([key,inv])=>({key,inv,available:getAvailableStockForCart(key)})).filter(x=>x.available>0);
   results.innerHTML=rows.length?rows.map(({key,inv,available})=>'<button type="button" class="manual-search-result" role="option" data-sale-stock-key="'+escapeHtml(key)+'"><span class="manual-search-result-content"><span class="manual-search-product-name">'+escapeHtml(inv.product.name)+'</span><span class="manual-search-stock in-stock">In-stock · Qty '+available+'</span></span></button>').join(""):'<div class="manual-search-empty">No products are currently available in stock.</div>';
-  toggle.disabled=!rows.length;const label=toggle.querySelector(".stock-picker-label span:last-child");if(label)label.textContent="Select products from available stock · "+rows.length+" available";limitListTo(results,5,"contain");
+  toggle.disabled=!rows.length;const label=toggle.querySelector(".stock-picker-label span:last-child");if(label)label.textContent="Select from available stock: "+rows.length+" products";limitListTo(results,5,"contain");
 }
 function addStockProductToCart(key){
   if(!key)return showAppAlert("Select a product from the available stock list.");
@@ -2963,7 +2963,7 @@ function renderCart(){
   const isSaleCart=cartMode==="selling";
   $("cartSection").querySelector("h2").textContent=isSaleCart?"SALE CART":"STOCK-IN CART";
   $("saleTypeToggle").classList.toggle("hidden",!isSaleCart);
-  $("postTransactionBtn").textContent=!isSaleCart?"SAVE STOCK-IN":"CHECK OUT SALE";
+  $("postTransactionBtn").textContent=!isSaleCart?"ADD STOCK-IN":"CHECK OUT SALE";
   const label=$("totalDP").previousElementSibling;if(label)label.textContent=isSaleCart?"Sale amount":"Total DP";
   $("actualSaleBtn").classList.toggle("active",saleType==="actual");$("recordSaleBtn").classList.toggle("active",saleType==="record");
   $("actualSaleBtn").setAttribute("aria-checked",String(saleType==="actual"));$("recordSaleBtn").setAttribute("aria-checked",String(saleType==="record"));
