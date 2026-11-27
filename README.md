@@ -286,6 +286,21 @@ These limits apply to the visible list area, not to the total number of records 
 
 Warnings, notices, and confirmation prompts are displayed in the application's own theme-matched dialog rather than the browser's default alert() or confirm() windows. Confirmation dialogs provide explicit **Cancel** and **Confirm** actions; informational messages provide an **OK** action. The dialog follows the active light or dark theme and is used for actions such as clearing stock, clearing a cart, importing a backup, and confirming scanner or history actions.
 
+### PDF filenames and document design
+
+All generated PDF reports use a descriptive **Vestige** filename that identifies the document type and reporting date. Date-range history exports include both selected dates; individual history records include their transaction date and time.
+
+PDFs share a consistent, colourful, cart-inspired layout with a branded header, readable product tables, alternating row backgrounds, highlighted totals, and page numbers. Current Stock, Stock-in History, and Sale History use layouts appropriate to their data. Sale reports also display payment status and sale type. PDF sharing continues to use the device share sheet when supported, with a download fallback.
+
+Examples:
+- `Vestige_Current_Stock_YYYY-MM-DD.pdf`
+- `Vestige_Sale_Record_YYYY-MM-DD_HHMM.pdf`
+- `Vestige_Stock_In_Record_YYYY-MM-DD_HHMM.pdf`
+- `Vestige_Sale_History_YYYY-MM-DD_to_YYYY-MM-DD.pdf`
+- `Vestige_Stock_In_History_YYYY-MM-DD_to_YYYY-MM-DD.pdf`
+
+The separate Shopping Cart image export remains a PNG and is not affected by the PDF report design.
+
 ## Local data, backup, and restore
 
 The application uses browser storage rather than a remote dealer database. In practical terms:
