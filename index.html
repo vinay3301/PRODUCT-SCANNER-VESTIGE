@@ -823,6 +823,7 @@ button:disabled {
 
 <main>
 
+  <section id="productListSection" class="product-list-section" aria-label="Product List">
   <section class="manual-search-panel" aria-label="Manual product search">
     <div class="manual-search-row">
       <input
@@ -922,9 +923,16 @@ button:disabled {
     <div class="match-meta hidden" id="selectionNote"></div>
   </section>
 
+  </section>
+
   <div class="mode-switch" role="group" aria-label="Work mode">
     <button type="button" id="stockingModeBtn">Stock</button>
     <button type="button" id="sellingModeBtn" class="active">Selling</button>
+  </div>
+
+  <div class="selling-view-nav business-actions hidden" id="sellingViewNav" role="group" aria-label="Selling views">
+    <button type="button" id="showProductListBtn" class="active">PRODUCT LIST</button>
+    <button type="button" id="showSaleHistoryBtn">SALE HISTORY</button>
   </div>
 
   <section class="business-panel" id="inventoryPanel">
@@ -1953,7 +1961,7 @@ function legacyRenderCart() {
     list.appendChild(row);
   });
 
-  limitListToTen(list);
+  limitListTo(list,6,"contain");
 
   const hasItems = cart.length > 0;
 
@@ -2635,8 +2643,8 @@ $("addToCartBtn").addEventListener("click",event=>{
 $("postTransactionBtn").addEventListener("click",postCurrentTransaction);
 $("stockingModeBtn").addEventListener("click",()=>setBusinessMode("stocking"));
 $("sellingModeBtn").addEventListener("click",()=>setBusinessMode("selling"));
-$("toggleStockListBtn").addEventListener("click",()=>{const list=$("stockList"),opening=list.classList.contains("hidden");list.classList.toggle("hidden");if(opening)list.scrollTop=0;renderInventory();});
-$("toggleStockHistoryBtn").addEventListener("click",()=>{$("stockHistoryList").classList.toggle("hidden");renderStockHistory();});
+$("toggleStockListBtn").addEventListener("click",()=>{const list=$("stockList"),history=$("stockHistoryList"),opening=list.classList.contains("hidden");history.classList.add("hidden");list.classList.toggle("hidden",!opening);if(opening)list.scrollTop=0;renderInventory();});
+$("toggleStockHistoryBtn").addEventListener("click",()=>{const list=$("stockList"),history=$("stockHistoryList"),opening=history.classList.contains("hidden");list.classList.add("hidden");history.classList.toggle("hidden",!opening);if(opening)history.scrollTop=0;renderStockHistory();});
 $("stockHistoryList").addEventListener("click",handleHistoryToggle);
 $("salesHistoryList").addEventListener("click",handleHistoryToggle);
 
@@ -2718,7 +2726,7 @@ function postStockIn(){
 function postCurrentTransaction(){if(transactionBusy)return;transactionBusy=true;$("postTransactionBtn").disabled=true;try{if(cartMode==="stocking")postStockIn();else postSale();}finally{transactionBusy=false;updateCheckoutButton();}}
 function setupSalesUI(){
   const style=document.createElement("style");
-  style.textContent=`.business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--secondary-bg);flex:none}.sale-type-toggle button{padding:7px 11px;min-height:34px;border-radius:999px;background:transparent;color:var(--subtle-text);font-size:13px;line-height:1.1}.sale-type-toggle button.active{background:var(--green);color:var(--primary-text)}.sale-heading-right{display:flex;align-items:center;gap:8px;min-width:0}.clear-stock-btn{font-size:10px!important;min-height:30px!important;padding:5px 9px!important;justify-self:end;background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}.stock-quantity-controls{display:flex;align-items:center;gap:6px}.stock-quantity-controls button{width:32px;height:32px;min-height:32px;padding:0;border-radius:8px;font-size:18px;background:var(--button-bg);color:var(--text)}.stock-quantity-controls strong{min-width:20px;text-align:center}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:block;margin:12px 0}
+  style.textContent=`.business-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.business-stat{padding:13px}.business-stat small{font-size:13px;font-weight:650}.business-stat strong{font-size:20px}.business-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.business-actions button,.history-card button{font-size:13px;min-height:43px}.history-detail{font-size:14px;line-height:1.75}.history-card{padding:14px}.history-card strong{font-size:15px}.history-card small{font-size:13px}.sale-type-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--secondary-bg);flex:none}.sale-type-toggle button{padding:7px 11px;min-height:34px;border-radius:999px;background:transparent;color:var(--subtle-text);font-size:13px;line-height:1.1}.sale-type-toggle button.active{background:var(--green);color:var(--primary-text)}.sale-heading-right{display:flex;align-items:center;gap:8px;min-width:0}.clear-stock-btn{font-size:10px!important;min-height:30px!important;padding:5px 9px!important;justify-self:end;background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}.cart-list{gap:5px;margin-top:9px}.cart-item{padding:7px 9px;gap:8px}.cart-item-prices{gap:8px;margin-top:3px}.sales-overview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 16px}.sales-overview .business-stat strong{font-size:21px}.sale-product-picker{display:block;margin:12px 0}
 .stock-picker-panel{padding:9px;background:var(--panel);border:1px solid var(--line);border-radius:13px}
 #saleStockPickerToggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:10px 12px;text-align:left;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600}
 #saleStockPickerToggle:focus-visible{outline:2px solid var(--green);outline-offset:2px}
@@ -2737,7 +2745,7 @@ function setupSalesUI(){
 .sale-payment-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .sale-payment-options button{min-height:39px;padding:8px 6px;font-size:12px}
 .sale-payment-options button:last-child{grid-column:1/-1}
-.sale-payment-cancel{width:100%;min-height:32px;margin-top:8px;padding:5px;background:transparent!important;color:var(--muted)!important;border:0!important;font-size:12px}
+
 .history-share-dialog{position:fixed;inset:0;z-index:10000;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px}.history-share-dialog[hidden]{display:none}.history-share-panel{width:min(100%,420px);background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:18px}.history-share-panel h3{margin:0 0 8px;font-size:18px}.history-share-panel p{margin:0 0 14px;color:var(--muted);font-size:13px}.history-share-panel label{display:block;font-size:13px;font-weight:650;margin:10px 0 5px}.history-share-panel input{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--input-bg);color:var(--text);font:inherit}.history-share-dialog-actions{display:flex;gap:8px;margin-top:16px}.history-share-dialog-actions button{flex:1;min-height:42px;font-size:13px}.sale-history-list .history-card{padding:8px 10px}.sale-history-list .history-card strong{font-size:15px}.sale-history-list .history-card small{font-size:13px}.sale-history-list .history-detail{font-size:15px;line-height:1.6;margin-top:6px}.sale-history-list .business-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.sale-history-list .business-actions button{flex:1 1 100px;min-height:32px;padding:5px 8px}.sale-checkout-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.sale-checkout-actions button{width:100%;min-height:42px;padding:8px 6px;font-size:12px}.clear-sale-cart-btn{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}.danger-action{background:var(--danger-bg)!important;color:var(--danger-text)!important;border:1px solid var(--danger-border)!important}@media(max-width:420px){.business-stat strong,.sales-overview .business-stat strong{font-size:18px}.sale-heading-right{gap:5px}.sale-type-toggle button{padding:7px 8px;font-size:12px}.sale-heading-right .cart-count{padding:4px 7px;font-size:10px}}`;
   document.head.appendChild(style);
   const shareDialog=document.createElement("div");shareDialog.id="historyShareDialog";shareDialog.className="history-share-dialog";shareDialog.hidden=true;
@@ -2753,7 +2761,7 @@ function setupSalesUI(){
   history.classList.add("sale-history-list");section.appendChild(history);
   const checkout=$("postTransactionBtn"),actions=document.createElement("div");actions.className="sale-checkout-actions";
   const clearButton=document.createElement("button");clearButton.type="button";clearButton.id="clearSaleCartBtn";clearButton.className="clear-sale-cart-btn";clearButton.textContent="CLEAR SALE CART";
-  checkout.textContent="CHECK OUT SALE";checkout.parentElement.replaceWith(actions);actions.append(checkout,clearButton);actions.insertAdjacentElement("afterend",section);
+  checkout.textContent="CHECK OUT SALE";checkout.parentElement.replaceWith(actions);actions.append(checkout,clearButton);$("sellingViewNav").insertAdjacentElement("afterend",section);
   // Bind controls only after their dynamically-created section is attached to the document.
   $("shareSaleHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("sale"));
   $("shareStockHistoryBtn").addEventListener("click",()=>openHistoryShareDialog("stock"));
@@ -2857,16 +2865,10 @@ function compareProductEntriesByName(a,b){
 function renderInventory(){
   const t=getInventoryTotals();$("stockDpValue").textContent=formatCartMoney(t.dp);$("stockPvValue").textContent=t.pv.toLocaleString("en-IN",{maximumFractionDigits:2});
   const el=$("stockList");if(el&&!el.classList.contains("hidden")){
-    const rows=Object.entries(businessData.inventory).sort(compareProductEntriesByName);
-    el.innerHTML=rows.length?rows.map(([k,v])=>'<div class="business-row"><div><strong>'+escapeHtml(v.product.name)+'</strong><small>DP '+escapeHtml(formatMoney(v.product.DP))+' · PV '+escapeHtml(v.product.pv??0)+'</small></div><div class="stock-quantity-controls"><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="-1" aria-label="Decrease stock">−</button><strong>'+Number(v.quantity)+'</strong><button type="button" data-stock-key="'+escapeHtml(k)+'" data-stock-delta="1" aria-label="Increase stock">+</button></div></div>').join(""):'<div class="business-muted">No stock recorded yet.</div>';
+    const rows=Object.entries(businessData.inventory).filter(([,v])=>Number(v.quantity)>0).sort(compareProductEntriesByName);
+    el.innerHTML=rows.length?rows.map(([k,v])=>'<div class="business-row"><div><strong>'+escapeHtml(v.product.name)+'</strong><small>DP '+escapeHtml(formatMoney(v.product.DP))+' · PV '+escapeHtml(v.product.pv??0)+'</small></div><strong class="stock-quantity-value">Qty '+Number(v.quantity)+'</strong></div>').join(""):'<div class="business-muted">No products are currently in stock.</div>';
     limitListToFive(el);
   }renderSaleProductOptions();updateCheckoutButton();
-}
-function adjustStockQuantity(key,delta){
-  const current=businessData.inventory[key];if(!current)return;
-  const next=JSON.parse(JSON.stringify(businessData)),row=next.inventory[key];
-  row.quantity=Math.max(0,(Number(row.quantity)||0)+(delta>0?1:-1));row.updatedAt=new Date().toISOString();
-  if(saveBusinessData(next)){renderInventory();renderCart();setStatus("Stock updated for "+row.product.name+".");}
 }
 function clearAllStock(){
   const entries=Object.entries(businessData.inventory||{}).filter(([,v])=>Number(v.quantity)>0);
@@ -2900,7 +2902,11 @@ function setBusinessMode(mode){
     $("cartName").value=cartName;saveCartToStorage();
   }else{currentMode=requested;cartMode=requested;}
   $("stockingModeBtn").classList.toggle("active",currentMode==="stocking");$("sellingModeBtn").classList.toggle("active",currentMode==="selling");
-  $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");$("salesHistorySection").classList.toggle("hidden",currentMode!=="selling");
+  $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");
+  $("sellingViewNav").classList.toggle("hidden",currentMode!=="selling");
+  $("productListSection").classList.remove("hidden");$("salesHistorySection").classList.add("hidden");
+  $("showProductListBtn").classList.add("active");$("showSaleHistoryBtn").classList.remove("active");
+  $("stockList").classList.add("hidden");$("stockHistoryList").classList.add("hidden");
   const isSaleCart=cartMode==="selling";
   $("cartName").previousElementSibling.textContent=isSaleCart?"Customer name (optional)":"Stock-in reference (optional)";
   $("cartName").placeholder=isSaleCart?"Enter customer name":"Optional stock-in note";
@@ -2908,6 +2914,14 @@ function setBusinessMode(mode){
   $("saleTypeToggle").classList.toggle("hidden",!isSaleCart);
   setSaleType(saleType);
   renderCart();renderInventory();renderStockHistory();renderSalesHistory();renderSalesOverview();
+}
+function showSellingView(view){
+  if(currentMode!=="selling")return;
+  const showHistory=view==="history";
+  $("productListSection").classList.toggle("hidden",showHistory);
+  $("salesHistorySection").classList.toggle("hidden",!showHistory);
+  $("showProductListBtn").classList.toggle("active",!showHistory);
+  $("showSaleHistoryBtn").classList.toggle("active",showHistory);
 }
 function renderCart(){
   legacyRenderCart();
@@ -2943,13 +2957,13 @@ function showSalePaymentDialog(onChoice){
   let dialog=$("salePaymentDialog");
   if(!dialog){
     dialog=document.createElement("div");dialog.id="salePaymentDialog";dialog.className="sale-payment-dialog";
-    dialog.innerHTML='<div class="sale-payment-panel" role="dialog" aria-modal="true" aria-labelledby="salePaymentTitle"><h3 id="salePaymentTitle">Payment status</h3><p>Would you like to record payment for this sale?</p><div class="sale-payment-options"><button type="button" class="primary" data-payment-choice="paid">PAID</button><button type="button" class="secondary" data-payment-choice="unpaid">UNPAID</button><button type="button" class="secondary" data-payment-choice="unknown">NOT SPECIFIED</button></div><button type="button" class="sale-payment-cancel" data-payment-choice="cancel">Cancel</button></div>';
+    dialog.innerHTML='<div class="sale-payment-panel" role="dialog" aria-modal="true" aria-labelledby="salePaymentTitle"><h3 id="salePaymentTitle">Payment status</h3><p>Would you like to record payment for this sale?</p><div class="sale-payment-options"><button type="button" class="primary" data-payment-choice="paid">PAID</button><button type="button" class="secondary" data-payment-choice="unpaid">UNPAID</button><button type="button" class="secondary" data-payment-choice="unknown">NOT SPECIFIED</button></div></div>';
     document.body.appendChild(dialog);
     dialog.addEventListener("click",event=>{
       if(event.target===dialog){dialog.hidden=true;return;}
       const button=event.target.closest("[data-payment-choice]");if(!button)return;
       dialog.hidden=true;const choice=button.dataset.paymentChoice;
-      if(choice!=="cancel"&&dialog._onChoice)dialog._onChoice(choice);
+      if(dialog._onChoice)dialog._onChoice(choice);
     });
   }
   dialog._onChoice=onChoice;dialog.hidden=false;
@@ -3080,11 +3094,12 @@ async function importBusinessBackup(event){
 }
 function initializeBusinessFeatures(){
   loadBusinessData();$("salesHistoryList").addEventListener("click",handleSalesHistoryClick);
+  $("showProductListBtn").addEventListener("click",()=>showSellingView("products"));
+  $("showSaleHistoryBtn").addEventListener("click",()=>showSellingView("history"));
   $("actualSaleBtn").addEventListener("click",()=>setSaleType("actual"));$("recordSaleBtn").addEventListener("click",()=>setSaleType("record"));
   $("saleStockPickerToggle").addEventListener("click",()=>{const results=$("saleStockResults"),opening=results.classList.contains("hidden");results.classList.toggle("hidden",!opening);$("saleStockPickerToggle").setAttribute("aria-expanded",String(opening));if(opening)renderSaleProductOptions();});
   $("saleStockResults").addEventListener("click",event=>{const button=event.target.closest("button[data-sale-stock-key]");if(button)addStockProductToCart(button.dataset.saleStockKey);});
   $("saleDateInput").value=formatLocalDateTimeInput(new Date());
-  $("stockList").addEventListener("click",event=>{const button=event.target.closest("button[data-stock-key]");if(button)adjustStockQuantity(button.dataset.stockKey,Number(button.dataset.stockDelta));});
   $("clearStockBtn").addEventListener("click",clearAllStock);
   setBusinessMode(cart.length ? cartMode : "selling");renderStockHistory();renderSalesHistory();renderSalesOverview();
 }

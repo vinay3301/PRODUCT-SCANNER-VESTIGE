@@ -195,38 +195,16 @@ test("Overselling is rejected for Actual Sale without changing stock or history"
   assert.match(x.alerts.at(-1), /Insufficient stock/);
 });
 
-test("Manual stock adjustment persists quantity changes without changing the prepared sale cart", () => {
-  const x = createHarness();
-  seedStock(x, k1, assure, 5);
-  x.context.cartMode = "selling";
-  x.context.currentMode = "stocking";
-  x.context.saleType = "actual";
-  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
-  x.context.adjustStockQuantity(k1, -1);
-  assert.equal(x.context.getStockQuantity(k1), 4);
-  assert.equal(x.context.cart[0].quantity, 3);
-  assert.equal(x.context.cart[0].freeQuantity, 1);
-  assert.ok(x.storage.has(x.context.BUSINESS_STORAGE_KEY));
-});
-
-test("Actual Sale checkout is blocked after manual stock reduction creates a shortage", () => {
-  const x = createHarness();
-  seedStock(x, k1, assure, 3);
-  x.context.cartMode = "selling";
-  x.context.currentMode = "stocking";
-  x.context.saleType = "actual";
-  x.context.cart = [{ key: k1, product: assure, quantity: 3, freeQuantity: 1 }];
-  x.context.adjustStockQuantity(k1, -1);
-  assert.equal(x.context.cart[0].quantity, 3);
-  const shortage = x.context.getSaleStockShortages()[0];
-  assert.equal(shortage.name, assure.name);
-  assert.equal(shortage.required, 3);
-  assert.equal(shortage.available, 2);
-  assert.equal(shortage.shortage, 1);
-  x.context.postSale();
-  assert.equal(x.context.businessData.sales.length, 0);
-  assert.equal(x.context.getStockQuantity(k1), 2);
-  assert.match(x.alerts.at(-1), /Insufficient stock/);
+test("Stock List shows only positive quantities and has no direct quantity controls", () => {
+  const start = html.indexOf("function renderInventory()");
+  const end = html.indexOf("\nfunction clearAllStock()", start);
+  assert.ok(start >= 0 && end > start, "Could not locate Stock List renderer");
+  const source = html.slice(start, end);
+  assert.match(source, /Object\.entries\(businessData\.inventory\)\.filter\(\(\[,v\]\)=>Number\(v\.quantity\)>0\)/);
+  assert.match(source, /No products are currently in stock/);
+  assert.doesNotMatch(source, /data-stock-key|data-stock-delta/);
+  assert.doesNotMatch(html, /function adjustStockQuantity\(/);
+  assert.doesNotMatch(html, /stock-quantity-controls/);
 });
 
 test("Clear Stock resets quantities but retains product catalogue and sale history", () => {
@@ -383,13 +361,13 @@ test("Seven-day edit restriction is retained", () => {
 });
 
 
-test("Sale cart uses compact sale-type toggle, checkout wording, and manual stock controls", () => {
+test("Sale cart uses compact sale-type toggle, checkout wording, and no direct stock controls", () => {
   assert.match(html, /SALE CART/);
   assert.match(html, /sale-type-toggle/);
   assert.match(html, /CHECK OUT ACTUAL SALE/);
   assert.match(html, /CHECK OUT RECORD SALE/);
-  assert.match(html, /data-stock-delta="-1"/);
-  assert.match(html, /data-stock-delta="1"/);
+  assert.doesNotMatch(html, /data-stock-delta|data-stock-key|stock-quantity-controls/);
+  assert.match(html, /stock-quantity-value/);
   assert.match(html, /id="clearStockBtn"/);
   assert.doesNotMatch(html, /id="saveCartBtn"/);
   assert.doesNotMatch(html, /id="viewSavedBtn"/);
@@ -423,17 +401,20 @@ test("Stock List retains five-entry viewport while histories use five-entry scro
   assert.equal(list.style.overscrollBehavior, "auto");
 });
 
-test("Sale cart viewport shows ten products and scrolls continuously beyond ten", () => {
+test("Stock-In and Sale carts show six entries and scroll only inside the product area", () => {
   const x = createHarness();
-  const children = Array.from({ length: 12 }, (_, i) => ({
+  const children = Array.from({ length: 9 }, (_, i) => ({
     getBoundingClientRect: () => ({ top: i * 52, bottom: i * 52 + 45 })
   }));
-  const list = { children, style: {}, scrollTop: 156 };
-  x.context.limitListToTen(list);
-  assert.equal(list.style.maxHeight, "513px");
+  const list = { children, style: {}, scrollTop: 104 };
+  x.context.limitListTo(list, 6, "contain");
+  assert.equal(list.style.maxHeight, "305px");
   assert.equal(list.style.overflowY, "auto");
   assert.equal(list.style.overscrollBehavior, "contain");
-  assert.equal(list.scrollTop, 156);
+  assert.equal(list.scrollTop, 104);
+  assert.match(html, /limitListTo\(list,6,"contain"\)/);
+  assert.match(html, /\.cart-list\{gap:5px;margin-top:9px\}\.cart-item\{padding:7px 9px;gap:8px\}/);
+  assert.match(html, /--font-cart-product:16px;\s*--font-cart-details:14px/);
 });
 
 test("Stock-in History shows five compact summaries with expandable alphabetized products", () => {
@@ -576,12 +557,36 @@ test("Sale UI uses product-style available-stock rows and an unpaid-sales counte
   assert.match(html, /stock-picker-panel/);
   assert.match(html, /#saleStockResults \.manual-search-result/);
   assert.match(html, /isn't available to add/);
+  assert.match(html, /data-payment-choice="paid">PAID/);
+  assert.match(html, /data-payment-choice="unpaid">UNPAID/);
   assert.match(html, /data-payment-choice="unknown">NOT SPECIFIED/);
+  assert.doesNotMatch(html, /data-payment-choice="cancel"|sale-payment-cancel/);
   assert.match(html, /sale-payment-panel/);
   assert.doesNotMatch(html, /confirm\("Has this sale been paid/);
   assert.match(html, /id="unpaidSalesFilterBtn"/);
   assert.match(html, /UNPAID SALES:/);
   assert.match(html, /Payment: /);
+});
+
+test("Selling mode starts on Product List and opens Sale History only when selected", () => {
+  assert.match(html, /id="productListSection" class="product-list-section"/);
+  assert.match(html, /class="selling-view-nav business-actions hidden" id="sellingViewNav"/);
+  assert.match(html, /id="showProductListBtn" class="active">PRODUCT LIST/);
+  assert.match(html, /id="showSaleHistoryBtn">SALE HISTORY/);
+  assert.match(html, /section\.id="salesHistorySection";section\.className="sale-history-section hidden"/);
+  assert.match(html, /function showSellingView\(view\)/);
+  assert.match(html, /\$\("productListSection"\)\.classList\.toggle\("hidden",showHistory\)/);
+  assert.match(html, /\$\("salesHistorySection"\)\.classList\.toggle\("hidden",!showHistory\)/);
+  assert.match(html, /\$\("showProductListBtn"\)\.addEventListener\("click",\(\)=>showSellingView\("products"\)\)/);
+  assert.match(html, /\$\("showSaleHistoryBtn"\)\.addEventListener\("click",\(\)=>showSellingView\("history"\)\)/);
+  assert.match(html, /\$\("salesHistorySection"\)\.classList\.add\("hidden"\)/);
+});
+
+test("Stock List and Stock-In History start hidden and open exclusively", () => {
+  assert.match(html, /class="business-list hidden" id="stockList"/);
+  assert.match(html, /class="business-list hidden" id="stockHistoryList"/);
+  assert.match(html, /history\.classList\.add\("hidden"\);list\.classList\.toggle\("hidden",!opening\)/);
+  assert.match(html, /list\.classList\.add\("hidden"\);history\.classList\.toggle\("hidden",!opening\)/);
 });
 
 test("Stock-in and sale carts are persisted independently", () => {
@@ -750,11 +755,11 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ]);
 });
 
-test("Dynamically-created Sale History controls are attached before their listeners are bound", () => {
-  const sectionInsert = html.indexOf('actions.insertAdjacentElement("afterend",section)');
+test("Dynamically-created Sale History controls are attached after selling navigation before listeners bind", () => {
+  const sectionInsert = html.indexOf('$("sellingViewNav").insertAdjacentElement("afterend",section)');
   const saleShareListener = html.indexOf('$("shareSaleHistoryBtn").addEventListener');
   const stockShareListener = html.indexOf('$("shareStockHistoryBtn").addEventListener');
-  assert.ok(sectionInsert >= 0, "Sale History section must be inserted into the document");
+  assert.ok(sectionInsert >= 0, "Sale History section must be inserted below the Selling navigation");
   assert.ok(saleShareListener > sectionInsert, "Sale History share button listener must be bound after insertion");
   assert.ok(stockShareListener > sectionInsert, "Stock-in share button listener must be bound after insertion");
 });
