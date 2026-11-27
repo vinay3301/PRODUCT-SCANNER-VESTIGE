@@ -1575,7 +1575,7 @@ function addSelectedProductToCart() {
   }
 
   const existing = cart.find(item => item.key === key);
-  if (cartMode === "selling" && saleType==="actual") {
+  if (cartMode === "selling") {
     const currentQty = Number(existing?.quantity)||0;
     if (currentQty + 1 > getSaleStockLimit(key)) {
       alert("No additional stock is available for " + product.name + ".");
@@ -1633,7 +1633,7 @@ function changeCartQuantity(key, change) {
 
   if (!item) return;
 
-  if(cartMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){
+  if(cartMode==="selling"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){
     alert("You cannot add more than the available stock for "+item.product.name+".");
     return;
   }
@@ -2794,7 +2794,7 @@ function addSelectedProductToCart(){
 }
 function changeCartQuantity(key,change){
   const item=cart.find(i=>i.key===key);if(!item)return;
-  if(cartMode==="selling"&&saleType==="actual"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){alert("You cannot add more than the available stock for "+item.product.name+".");return;}
+  if(cartMode==="selling"&&change>0&&Number(item.quantity)+change>getSaleStockLimit(key)){alert("You cannot add more than the available stock for "+item.product.name+".");return;}
   item.quantity=Math.max(0,Number(item.quantity)+change);item.freeQuantity=Math.min(Number(item.freeQuantity)||0,item.quantity);
   if(item.quantity===0)cart=cart.filter(x=>x!==item);saveCartToStorage();renderCart();
 }
@@ -3026,7 +3026,7 @@ async function shareHistoryPdf(type,id=null,range=null){
 
 function handleSalesHistoryClick(event){const b=event.target.closest("button[data-sale-action]");if(!b)return;const id=b.dataset.saleId;if(b.dataset.saleAction==="edit")beginSaleEdit(id);if(b.dataset.saleAction==="delete")deleteSale(id);}
 function exportBusinessBackup(){
-  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart,cartMode},savedCarts};
+  const payload={app:"Product Scanner Vestige",backupVersion:1,exportedAt:new Date().toISOString(),businessData:normalizeBusinessData(businessData),activeCart:{cartName,cart,cartMode,carts:modeCarts},savedCarts};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="product-scanner-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);setStatus("Backup exported to this device.");
 }
 async function importBusinessBackup(event){
