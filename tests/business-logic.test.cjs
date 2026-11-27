@@ -608,7 +608,7 @@ test("Stock-in and sale carts are persisted independently", () => {
 
 test("Sale history layout has side-by-side checkout and clear-cart actions", () => {
   assert.match(html, /sale-checkout-actions/);
-  assert.match(html, /CLEAR SALE CART/);
+  assert.match(html, /clearButton\.textContent="CLEAR CART"/);
   assert.match(html, /CHECK OUT SALE/);
   assert.match(html, /clearButton\.addEventListener\("click"/);
 });
@@ -796,6 +796,23 @@ test("Sale and Stock-in histories expose individual and date-range PDF sharing",
   assert.match(html, /historyLocalDate\(d\)>=range\.from&&historyLocalDate\(d\)<=range\.to/);
 });
 
+test("All PDF exports use descriptive Vestige filenames and cart-inspired branded layouts", () => {
+  assert.match(html, /function pdfStartPage\(/);
+  assert.match(html, /function pdfDrawSummaryCards\(/);
+  assert.match(html, /function pdfDrawTable\(/);
+  assert.match(html, /function pdfShareOrDownload\(/);
+  assert.match(html, /Vestige_Current_Stock_/);
+  assert.match(html, /isSale\?"Sale":"Stock_In"/);
+  assert.match(html, /id\?"_Record":"_History"/);
+  assert.match(html, /else if\(range\)suffix=range\.from\+"_to_"\+range\.to/);
+  assert.match(html, /pdfDateTimeStamp\(date\)/);
+  assert.match(html, /_to_/);
+  assert.match(html, /PAYMENT STATUS:/);
+  assert.match(html, /SALE TYPE:/);
+  assert.match(html, /STOCK DP VALUE/);
+  assert.match(html, /doc\.roundedRect/);
+  assert.match(html, /doc\.output\("blob"\)/);
+});
 test("All warning and confirmation prompts use the app's themed dialog, not browser dialogs", () => {
   assert.doesNotMatch(html, /\b(?:alert|confirm|prompt)\s*\(/);
   assert.match(businessSource, /function showAppDialog\(/);
