@@ -58,9 +58,14 @@ function createHarness() {
     formatMoney: v => String(v),
     escapeHtml: v => String(v ?? ""),
     setStatus: () => {}, saveCartToStorage: () => {}, loadCartFromStorage: () => {}, loadSavedCartsFromStorage: () => {},
-    alert: message => alerts.push(String(message)), confirm: () => true, console
+    alert: message => alerts.push(String(message)), confirm: () => true,
+    showAppAlert: message => { alerts.push(String(message)); return Promise.resolve(true); },
+    showAppConfirm: () => Promise.resolve(true), console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
+  // Replace the interactive modal UI with deterministic test responses after script evaluation.
+  context.showAppAlert = message => { alerts.push(String(message)); return Promise.resolve(true); };
+  context.showAppConfirm = () => Promise.resolve(true);
   vm.runInNewContext(totalsSource, context, { filename: "index.html#cart-totals" });
   vm.runInNewContext(normalizeSource, context, { filename: "index.html#cart-normalization" });
   const originalPostSale = context.postSale;
@@ -81,9 +86,14 @@ function createHarness() {
 }
 
 const results = [];
+const pendingTests = [];
 function test(name, fn) {
-  try { fn(); results.push({ name, status: "PASS" }); }
-  catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
+  try {
+    const result = fn();
+    if (result && typeof result.then === "function") {
+      pendingTests.push(result.then(() => results.push({ name, status: "PASS" })).catch(error => results.push({ name, status: "FAIL", error: error.message })));
+    } else results.push({ name, status: "PASS" });
+  } catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
 }
 function product(name, MRP, DP, pv) { return { name, MRP, DP, pv }; }
 const assure = product("ASSURE ENCHANT BODY TALK", 103, 73, 1.99);
@@ -197,7 +207,7 @@ test("Overselling is rejected for Actual Sale without changing stock or history"
 
 test("Stock List shows only positive quantities and has no direct quantity controls", () => {
   const start = html.indexOf("function renderInventory()");
-  const end = html.indexOf("\nfunction clearAllStock()", start);
+  const end = html.indexOf("\nasync function clearAllStock()", start);
   assert.ok(start >= 0 && end > start, "Could not locate Stock List renderer");
   const source = html.slice(start, end);
   assert.match(source, /Object\.entries\(businessData\.inventory\)\.filter\(\(\[,v\]\)=>Number\(v\.quantity\)>0\)/);
@@ -207,11 +217,11 @@ test("Stock List shows only positive quantities and has no direct quantity contr
   assert.doesNotMatch(html, /stock-quantity-controls/);
 });
 
-test("Clear Stock resets quantities but retains product catalogue and sale history", () => {
+test("Clear Stock resets quantities but retains product catalogue and sale history", async () => {
   const x = createHarness();
   seedStock(x, k1, assure, 7);
   x.context.businessData.sales = [{ id: "existing", createdAt: new Date().toISOString(), saleDate: new Date().toISOString(), saleType: "record", total: 20, items: [] }];
-  x.context.clearAllStock();
+  await x.context.clearAllStock();
   assert.equal(x.context.getStockQuantity(k1), 0);
   assert.equal(x.context.businessData.inventory[k1].product.name, assure.name);
   assert.equal(x.context.businessData.sales.length, 1);
@@ -300,18 +310,18 @@ test("Changing Record Sale to Actual Sale deducts the new quantities", () => {
   assert.equal(c.businessData.sales[0].saleType, "actual");
 });
 
-test("Deleting Actual Sale restores all paid and free units", () => {
+test("Deleting Actual Sale restores all paid and free units", async () => {
   const x = createHarness();
   const sale = addSale(x, "actual", 3, 1);
-  x.context.deleteSale(sale.id);
+  await x.context.deleteSale(sale.id);
   assert.equal(x.context.getStockQuantity(k1), 10);
   assert.equal(x.context.businessData.sales.length, 0);
 });
 
-test("Deleting Record Sale leaves stock unchanged", () => {
+test("Deleting Record Sale leaves stock unchanged", async () => {
   const x = createHarness();
   const sale = addSale(x, "record", 3, 1);
-  x.context.deleteSale(sale.id);
+  await x.context.deleteSale(sale.id);
   assert.equal(x.context.getStockQuantity(k1), 10);
   assert.equal(x.context.businessData.sales.length, 0);
 });
@@ -385,7 +395,7 @@ test("Every static event-listener target is present in the HTML or generated UI 
 test("Stock List retains five-entry viewport while histories use five-entry scroll chaining", () => {
   assert.match(html, /limitListToFive\(el\)/);
   assert.match(html, /limitListTo\(el,5,"auto"\)/);
-  assert.match(html, /function limitListTo\(el,visibleCount,overscrollBehavior="contain"\)/);
+  assert.match(html, /function limitListTo\(el,visibleCount,overscrollBehavior="auto"\)/);
   const x = createHarness();
   const children = Array.from({ length: 7 }, (_, i) => ({
     getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
@@ -394,7 +404,7 @@ test("Stock List retains five-entry viewport while histories use five-entry scro
   x.context.limitListToFive(list);
   assert.equal(list.style.maxHeight, "282px");
   assert.equal(list.style.overflowY, "auto");
-  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.overscrollBehavior, "auto");
   assert.equal(list.style.scrollbarGutter, "stable");
   assert.equal(list.scrollTop, 116);
   x.context.limitListTo(list, 5, "auto");
@@ -407,12 +417,12 @@ test("Stock-In and Sale carts show six entries and scroll only inside the produc
     getBoundingClientRect: () => ({ top: i * 52, bottom: i * 52 + 45 })
   }));
   const list = { children, style: {}, scrollTop: 104 };
-  x.context.limitListTo(list, 6, "contain");
+  x.context.limitListTo(list, 6, "auto");
   assert.equal(list.style.maxHeight, "305px");
   assert.equal(list.style.overflowY, "auto");
-  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.overscrollBehavior, "auto");
   assert.equal(list.scrollTop, 104);
-  assert.match(html, /limitListTo\(list,6,"contain"\)/);
+  assert.match(html, /limitListTo\(list,6,"auto"\)/);
   assert.match(html, /\.cart-list\{gap:5px;margin-top:9px\}\.cart-item\{padding:7px 9px;gap:8px\}/);
   assert.match(html, /--font-cart-product:16px;\s*--font-cart-details:14px/);
 });
@@ -568,18 +578,19 @@ test("Sale UI uses product-style available-stock rows and an unpaid-sales counte
   assert.match(html, /Payment: /);
 });
 
-test("Selling mode starts on Product List and opens Sale History only when selected", () => {
+test("Selling mode keeps product fields visible and opens Sale History from the bottom of the cart", () => {
   assert.match(html, /id="productListSection" class="product-list-section"/);
-  assert.match(html, /class="selling-view-nav business-actions hidden" id="sellingViewNav"/);
-  assert.match(html, /id="showProductListBtn" class="active">PRODUCT LIST/);
-  assert.match(html, /id="showSaleHistoryBtn">SALE HISTORY/);
-  assert.match(html, /section\.id="salesHistorySection";section\.className="sale-history-section hidden"/);
+  assert.doesNotMatch(html, /sellingViewNav|showProductListBtn|showSaleHistoryBtn/);
+  assert.match(html, /id="saleHistoryToggleBtn"/);
+  assert.match(html, /className="secondary sale-history-toggle-btn"/);
+  assert.match(html, /\$\("cartSection"\)\.appendChild\(historyToggle\)/);
+  assert.match(html, /\$\("cartSection"\)\.insertAdjacentElement\("afterend",section\)/);
   assert.match(html, /function showSellingView\(view\)/);
-  assert.match(html, /\$\("productListSection"\)\.classList\.toggle\("hidden",showHistory\)/);
-  assert.match(html, /\$\("salesHistorySection"\)\.classList\.toggle\("hidden",!showHistory\)/);
-  assert.match(html, /\$\("showProductListBtn"\)\.addEventListener\("click",\(\)=>showSellingView\("products"\)\)/);
-  assert.match(html, /\$\("showSaleHistoryBtn"\)\.addEventListener\("click",\(\)=>showSellingView\("history"\)\)/);
-  assert.match(html, /\$\("salesHistorySection"\)\.classList\.add\("hidden"\)/);
+  assert.match(html, /\$\("productListSection"\)\.classList\.remove\("hidden"\)/);
+  assert.match(html, /history\.classList\.toggle\("hidden",!showHistory\)/);
+  assert.match(html, /saleHistoryToggleBtn.*SHOW SALE HISTORY/);
+  assert.match(html, /saleHistoryToggleBtn"\)\.classList\.toggle\("hidden",currentMode!=="selling"\)/);
+  assert.match(html, /section\.id="salesHistorySection";section\.className="sale-history-section hidden"/);
 });
 
 test("Stock List and Stock-In History start hidden and open exclusively", () => {
@@ -713,8 +724,9 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   assert.equal(cameraContext.$("cameraScannerArea").classList.contains("hidden"), true);
   assert.match(html, /selectManualProduct\(product\)/);
   assert.doesNotMatch(html, /manualProductSelectBtn|confirmManualProductSelection/);
-  assert.match(html, /limitListTo\(results, 5, "contain"\)/);
-  assert.match(html, /overscroll-behavior:contain/);
+  assert.match(html, /limitListTo\(results, 5, "auto"\)/);
+  assert.match(html, /overscroll-behavior:auto/);
+  assert.doesNotMatch(html, /overscroll-behavior:contain/);
   assert.match(html, /let currentMode = "selling"/);
   assert.match(html, /setBusinessMode\(cart.length \? cartMode : "selling"\)/);
   assert.match(html, /id="sellingModeBtn" class="active"/);
@@ -755,15 +767,22 @@ test("Manual product search matches word prefixes only, prioritizes exact names,
   ]);
 });
 
-test("Dynamically-created Sale History controls are attached after selling navigation before listeners bind", () => {
-  const sectionInsert = html.indexOf('$("sellingViewNav").insertAdjacentElement("afterend",section)');
+test("Sale History is placed below the cart and its controls bind after insertion", () => {
+  const sectionInsert = html.indexOf('$("cartSection").insertAdjacentElement("afterend",section)');
   const saleShareListener = html.indexOf('$("shareSaleHistoryBtn").addEventListener');
   const stockShareListener = html.indexOf('$("shareStockHistoryBtn").addEventListener');
-  assert.ok(sectionInsert >= 0, "Sale History section must be inserted below the Selling navigation");
-  assert.ok(saleShareListener > sectionInsert, "Sale History share button listener must be bound after insertion");
-  assert.ok(stockShareListener > sectionInsert, "Stock-in share button listener must be bound after insertion");
+  assert.ok(sectionInsert >= 0, "Sale History section must be inserted below the cart");
+  assert.ok(saleShareListener > sectionInsert, "Sale History share listener must bind after insertion");
+  assert.ok(stockShareListener > sectionInsert, "Stock-in history share listener must bind after insertion");
 });
 
+test("Stock action row has the requested 40/40/20 layout and stock PDFs", () => {
+  assert.match(html, /\.stock-action-row\{display:grid;grid-template-columns:2fr 2fr 1fr/);
+  assert.match(html, /id="shareStockBtn"/);
+  assert.match(html, /id="shareStockHistoryBtn"/);
+  assert.match(html, /id="clearStockBtn" class="clear-stock-btn"/);
+  assert.match(html, /async function shareCurrentStockPdf/);
+});
 test("Sale and Stock-in histories expose individual and date-range PDF sharing", () => {
   assert.match(html, /id="shareStockHistoryBtn"/);
   assert.match(html, /id="shareSaleHistoryBtn"/);
@@ -777,6 +796,14 @@ test("Sale and Stock-in histories expose individual and date-range PDF sharing",
   assert.match(html, /historyLocalDate\(d\)>=range\.from&&historyLocalDate\(d\)<=range\.to/);
 });
 
+test("All warning and confirmation prompts use the app's themed dialog, not browser dialogs", () => {
+  assert.doesNotMatch(html, /\b(?:alert|confirm|prompt)\s*\(/);
+  assert.match(businessSource, /function showAppDialog\(/);
+  assert.match(businessSource, /function showAppAlert\(/);
+  assert.match(businessSource, /function showAppConfirm\(/);
+  assert.match(html, /\.app-dialog-panel/);
+  assert.match(html, /var\(--panel\)/);
+});
 test("Sale History typography matches the larger Stock-in History details", () => {
   assert.match(html, /\.sale-history-list \.history-card strong\{font-size:15px\}/);
   assert.match(html, /\.sale-history-list \.history-card small\{font-size:13px\}/);
@@ -784,11 +811,12 @@ test("Sale History typography matches the larger Stock-in History details", () =
 });
 
 (async () => {
+  await Promise.all(pendingTests);
   for (const result of results) {
     console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
   }
   const failed = results.filter(r => r.status === "FAIL");
-  console.log("\n" + (results.length - failed.length) + "/" + results.length + " synchronous tests passed");
+  console.log("\n" + (results.length - failed.length) + "/" + results.length + " tests passed");
   const asyncStart = results.length;
   const asyncTests = [
     ["Backup import restores inventory, sales and cart storage", async () => {
