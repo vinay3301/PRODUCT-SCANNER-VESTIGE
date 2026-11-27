@@ -414,7 +414,7 @@ test("Stock-In and Sale carts show six entries and scroll only inside the produc
   assert.equal(list.scrollTop, 104);
   assert.match(html, /limitListTo\(list,6,"contain"\)/);
   assert.match(html, /\.cart-list\{gap:5px;margin-top:9px\}\.cart-item\{padding:7px 9px;gap:8px\}/);
-  assert.match(html, /--font-cart-product:16px;--font-cart-details:14px/);
+  assert.match(html, /--font-cart-product:16px;\s*--font-cart-details:14px/);
 });
 
 test("Stock-in History shows five compact summaries with expandable alphabetized products", () => {
@@ -570,7 +570,7 @@ test("Sale UI uses product-style available-stock rows and an unpaid-sales counte
 
 test("Selling mode starts on Product List and opens Sale History only when selected", () => {
   assert.match(html, /id="productListSection" class="product-list-section"/);
-  assert.match(html, /id="sellingViewNav"[^>]*hidden/);
+  assert.match(html, /class="selling-view-nav business-actions hidden" id="sellingViewNav"/);
   assert.match(html, /id="showProductListBtn" class="active">PRODUCT LIST/);
   assert.match(html, /id="showSaleHistoryBtn">SALE HISTORY/);
   assert.match(html, /id="salesHistorySection" class="sale-history-section hidden"/);
