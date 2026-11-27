@@ -2663,6 +2663,7 @@ $("cartList").addEventListener("change",event=>{
 // ==========================================
 // DEALER STOCK, SALES AND BACKUP
 // ==========================================
+function emptyBusinessData(){return {schemaVersion:1,inventory:{},stockIns:[],sales:[]};}
 function showAppDialog(message,{confirm=false,title}={}){
   let dialog=$("appDialog");
   if(!dialog){dialog=document.createElement("div");dialog.id="appDialog";dialog.className="app-dialog";dialog.hidden=true;dialog.innerHTML='<div class="app-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage"><h3 id="appDialogTitle"></h3><p id="appDialogMessage"></p><div class="app-dialog-actions"><button type="button" class="app-dialog-cancel" id="appDialogCancel">Cancel</button><button type="button" class="app-dialog-confirm" id="appDialogOk">OK</button></div></div>';document.body.appendChild(dialog);}
@@ -2671,7 +2672,6 @@ function showAppDialog(message,{confirm=false,title}={}){
 }
 function showAppAlert(message){return showAppDialog(message,{confirm:false});}
 function showAppConfirm(message){return showAppDialog(message,{confirm:true});}
-function emptyBusinessData(){return {schemaVersion:1,inventory:{},stockIns:[],sales:[]};}
 function validCartItem(i){return !!i&&i.product&&typeof i.product.name==="string"&&Number.isFinite(Number(i.quantity))&&Number(i.quantity)>=0&&Number.isFinite(Number(i.freeQuantity??0))&&Number(i.freeQuantity??0)>=0;}
 function validCartPayload(c){return !!c&&typeof c==="object"&&Array.isArray(c.cart)&&c.cart.every(validCartItem);}
 function validSavedCartPayload(list){return Array.isArray(list)&&list.every(s=>s&&typeof s.id==="string"&&Array.isArray(s.cart)&&s.cart.every(validCartItem));}
