@@ -608,7 +608,7 @@ test("Stock-in and sale carts are persisted independently", () => {
 
 test("Sale history layout has side-by-side checkout and clear-cart actions", () => {
   assert.match(html, /sale-checkout-actions/);
-  assert.match(html, /CLEAR SALE CART/);
+  assert.match(html, /clearButton\.textContent="CLEAR CART"/);
   assert.match(html, /CHECK OUT SALE/);
   assert.match(html, /clearButton\.addEventListener\("click"/);
 });
@@ -804,7 +804,7 @@ test("All PDF exports use descriptive Vestige filenames and cart-inspired brande
   assert.match(html, /Vestige_Current_Stock_/);
   assert.match(html, /isSale\?"Sale":"Stock_In"/);
   assert.match(html, /id\?"_Record":"_History"/);
-  assert.match(html, /range\?range\.from\+"_to_"\+range\.to/);
+  assert.match(html, /else if\(range\)suffix=range\.from\+"_to_"\+range\.to/);
   assert.match(html, /pdfDateTimeStamp\(date\)/);
   assert.match(html, /_to_/);
   assert.match(html, /PAYMENT STATUS:/);
