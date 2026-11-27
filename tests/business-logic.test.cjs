@@ -86,9 +86,14 @@ function createHarness() {
 }
 
 const results = [];
+const pendingTests = [];
 function test(name, fn) {
-  try { fn(); results.push({ name, status: "PASS" }); }
-  catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
+  try {
+    const result = fn();
+    if (result && typeof result.then === "function") {
+      pendingTests.push(result.then(() => results.push({ name, status: "PASS" })).catch(error => results.push({ name, status: "FAIL", error: error.message })));
+    } else results.push({ name, status: "PASS" });
+  } catch (error) { results.push({ name, status: "FAIL", error: error.message }); }
 }
 function product(name, MRP, DP, pv) { return { name, MRP, DP, pv }; }
 const assure = product("ASSURE ENCHANT BODY TALK", 103, 73, 1.99);
@@ -202,7 +207,7 @@ test("Overselling is rejected for Actual Sale without changing stock or history"
 
 test("Stock List shows only positive quantities and has no direct quantity controls", () => {
   const start = html.indexOf("function renderInventory()");
-  const end = html.indexOf("\nfunction clearAllStock()", start);
+  const end = html.indexOf("\nasync function clearAllStock()", start);
   assert.ok(start >= 0 && end > start, "Could not locate Stock List renderer");
   const source = html.slice(start, end);
   assert.match(source, /Object\.entries\(businessData\.inventory\)\.filter\(\(\[,v\]\)=>Number\(v\.quantity\)>0\)/);
@@ -212,11 +217,11 @@ test("Stock List shows only positive quantities and has no direct quantity contr
   assert.doesNotMatch(html, /stock-quantity-controls/);
 });
 
-test("Clear Stock resets quantities but retains product catalogue and sale history", () => {
+test("Clear Stock resets quantities but retains product catalogue and sale history", async () => {
   const x = createHarness();
   seedStock(x, k1, assure, 7);
   x.context.businessData.sales = [{ id: "existing", createdAt: new Date().toISOString(), saleDate: new Date().toISOString(), saleType: "record", total: 20, items: [] }];
-  x.context.clearAllStock();
+  await x.context.clearAllStock();
   assert.equal(x.context.getStockQuantity(k1), 0);
   assert.equal(x.context.businessData.inventory[k1].product.name, assure.name);
   assert.equal(x.context.businessData.sales.length, 1);
@@ -305,18 +310,18 @@ test("Changing Record Sale to Actual Sale deducts the new quantities", () => {
   assert.equal(c.businessData.sales[0].saleType, "actual");
 });
 
-test("Deleting Actual Sale restores all paid and free units", () => {
+test("Deleting Actual Sale restores all paid and free units", async () => {
   const x = createHarness();
   const sale = addSale(x, "actual", 3, 1);
-  x.context.deleteSale(sale.id);
+  await x.context.deleteSale(sale.id);
   assert.equal(x.context.getStockQuantity(k1), 10);
   assert.equal(x.context.businessData.sales.length, 0);
 });
 
-test("Deleting Record Sale leaves stock unchanged", () => {
+test("Deleting Record Sale leaves stock unchanged", async () => {
   const x = createHarness();
   const sale = addSale(x, "record", 3, 1);
-  x.context.deleteSale(sale.id);
+  await x.context.deleteSale(sale.id);
   assert.equal(x.context.getStockQuantity(k1), 10);
   assert.equal(x.context.businessData.sales.length, 0);
 });
@@ -390,7 +395,7 @@ test("Every static event-listener target is present in the HTML or generated UI 
 test("Stock List retains five-entry viewport while histories use five-entry scroll chaining", () => {
   assert.match(html, /limitListToFive\(el\)/);
   assert.match(html, /limitListTo\(el,5,"auto"\)/);
-  assert.match(html, /function limitListTo\(el,visibleCount,overscrollBehavior="contain"\)/);
+  assert.match(html, /function limitListTo\(el,visibleCount,overscrollBehavior="auto"\)/);
   const x = createHarness();
   const children = Array.from({ length: 7 }, (_, i) => ({
     getBoundingClientRect: () => ({ top: i * 58, bottom: i * 58 + 50 })
@@ -399,7 +404,7 @@ test("Stock List retains five-entry viewport while histories use five-entry scro
   x.context.limitListToFive(list);
   assert.equal(list.style.maxHeight, "282px");
   assert.equal(list.style.overflowY, "auto");
-  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.overscrollBehavior, "auto");
   assert.equal(list.style.scrollbarGutter, "stable");
   assert.equal(list.scrollTop, 116);
   x.context.limitListTo(list, 5, "auto");
@@ -412,12 +417,12 @@ test("Stock-In and Sale carts show six entries and scroll only inside the produc
     getBoundingClientRect: () => ({ top: i * 52, bottom: i * 52 + 45 })
   }));
   const list = { children, style: {}, scrollTop: 104 };
-  x.context.limitListTo(list, 6, "contain");
+  x.context.limitListTo(list, 6, "auto");
   assert.equal(list.style.maxHeight, "305px");
   assert.equal(list.style.overflowY, "auto");
-  assert.equal(list.style.overscrollBehavior, "contain");
+  assert.equal(list.style.overscrollBehavior, "auto");
   assert.equal(list.scrollTop, 104);
-  assert.match(html, /limitListTo\(list,6,"contain"\)/);
+  assert.match(html, /limitListTo\(list,6,"auto"\)/);
   assert.match(html, /\.cart-list\{gap:5px;margin-top:9px\}\.cart-item\{padding:7px 9px;gap:8px\}/);
   assert.match(html, /--font-cart-product:16px;\s*--font-cart-details:14px/);
 });
@@ -805,11 +810,12 @@ test("Sale History typography matches the larger Stock-in History details", () =
 });
 
 (async () => {
+  await Promise.all(pendingTests);
   for (const result of results) {
     console.log((result.status === "PASS" ? "PASS" : "FAIL") + "  " + result.name + (result.error ? " — " + result.error : ""));
   }
   const failed = results.filter(r => r.status === "FAIL");
-  console.log("\n" + (results.length - failed.length) + "/" + results.length + " synchronous tests passed");
+  console.log("\n" + (results.length - failed.length) + "/" + results.length + " tests passed");
   const asyncStart = results.length;
   const asyncTests = [
     ["Backup import restores inventory, sales and cart storage", async () => {
