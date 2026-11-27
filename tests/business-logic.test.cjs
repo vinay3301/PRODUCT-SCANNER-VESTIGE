@@ -791,7 +791,7 @@ test("Sale and Stock-in histories expose individual and date-range PDF sharing",
 });
 
 test("All warning and confirmation prompts use the app's themed dialog, not browser dialogs", () => {
-  assert.doesNotMatch(html, /\\b(?:alert|confirm|prompt)\\s*\\(/);
+  assert.doesNotMatch(html, /\b(?:alert|confirm|prompt)\s*\(/);
   assert.match(businessSource, /function showAppDialog\(/);
   assert.match(businessSource, /function showAppAlert\(/);
   assert.match(businessSource, /function showAppConfirm\(/);
