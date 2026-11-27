@@ -24,6 +24,7 @@ function createHarness() {
   const storage = new Map();
   let failStorageWrites = false;
   function $(id) {
+    if (id === "salePaymentDialog" && !elements.has(id)) return null;
     if (!elements.has(id)) {
       elements.set(id, {
         value: "", textContent: "", innerHTML: "", disabled: false, files: [], style: {}, children: [], scrollTop: 0,
