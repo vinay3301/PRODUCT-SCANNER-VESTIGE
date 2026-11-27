@@ -810,8 +810,8 @@ test("All PDF exports use descriptive Vestige filenames and cart-inspired brande
   assert.match(html, /PAYMENT STATUS:/);
   assert.match(html, /SALE TYPE:/);
   assert.match(html, /STOCK DP VALUE/);
-  assert.match(html, /doc\\.roundedRect/);
-  assert.match(html, /doc\\.output\\("blob"\\)/);
+  assert.match(html, /doc\.roundedRect/);
+  assert.match(html, /doc\.output\("blob"\)/);
 });
 test("All warning and confirmation prompts use the app's themed dialog, not browser dialogs", () => {
   assert.doesNotMatch(html, /\b(?:alert|confirm|prompt)\s*\(/);
