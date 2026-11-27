@@ -546,7 +546,7 @@ test("Sale checkout records paid or unpaid status", () => {
   const unpaid = createHarness();
   seedStock(unpaid, k1, assure, 5);
   unpaid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
-  paid.context.deferPaymentChoice = true;
+  unpaid.context.deferPaymentChoice = true;
   unpaid.context.postSale();
   unpaid.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "unpaid" } }) } });
   assert.equal(unpaid.context.businessData.sales[0].paymentStatus, "unpaid");
