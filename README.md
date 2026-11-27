@@ -15,7 +15,8 @@ A mobile-friendly, browser-based Vestige product and dealer sales manager. The a
 - [Screen layout](#screen-layout)
 - [Button-by-button guide](#button-by-button-guide)
 - [Stock and sales calculations](#stock-and-sales-calculations)
-- [History display and scrolling](#history-display-and-scrolling)
+- [History display, PDF sharing, and scrolling](#history-display-pdf-sharing-and-scrolling)
+- [Custom warning and confirmation dialogs](#custom-warning-and-confirmation-dialogs)
 - [Local data, backup, and restore](#local-data-backup-and-restore)
 - [Important operating notes](#important-operating-notes)
 - [Repository and deployment](#repository-and-deployment)
@@ -84,10 +85,10 @@ The page contains these main areas:
 - **Camera scanner:** hidden until opened with SCAN; contains the live camera image, horizontal product-name scanning frame, and camera controls.
 - **Product card:** selected product name, MRP, DP, PV, match information, and product-match choices.
 - **Work-mode switch:** Stock and Selling.
-- **Current Stock panel:** stock value summary, stock list, stock-in history, and clear-stock action. Shown in Stock mode.
+- **Current Stock panel:** stock value summary, stock list, stock-in history, Share Stock, Share Stock-In History, and Clear Stock actions. Shown in Stock mode.
 - **Cart panel:** Stock-in Cart or Sale Cart depending on the active cart mode.
-- **Selling controls:** sale type, sales totals, optional Record Sale date/time, and product picker. Shown in Selling mode.
-- **Sale History:** shown in Selling mode.
+- **Selling controls:** sale type, sales totals, optional Record Sale date/time, and available-stock product picker. Shown in Selling mode, while the manual search, scanner, and product details above remain visible.
+- **Sale History:** initially hidden in Selling mode; opened with the button at the bottom of the Sale Cart. It appears below the cart and can be hidden again.
 - **Backup panel:** export and import business data.
 
 ---
@@ -103,7 +104,7 @@ The manual search is positioned above the camera scanner and uses an approximate
 | **Search product from catalogue** | Filters the already-loaded product catalogue as you type; it does not send a separate API request for every keystroke. Every typed term must match the beginning of a word in the product name. A full exact-name match is prioritised, and the remaining matches are sorted alphabetically. |
 | **Matching product row** | Shows the product name on the left and its dealer stock status on the right. **In-stock** appears in green when the browser's local inventory quantity is greater than zero; **Out of stock** appears in red when the quantity is zero, negative, or missing. |
 | **Select a matching product row** | Immediately selects that product and displays its MRP, DP, and PV in the existing product card. The search field and result list are then cleared. |
-| **Search results area** | Shows up to five rows in its visible area. Additional matches are available by scrolling inside the results area; scrolling is contained so it does not chain to the surrounding page. |
+| **Search results area** | Shows up to five rows in its visible area. Additional matches are available by scrolling inside the results area. When the list reaches its top or bottom, continued scrolling can move the surrounding page. |
 | **SCAN** | Reveals the camera scanner area. It does not start the camera automatically; use **Start camera** inside the revealed area when ready. |
 | **CLOSE** | Hides the scanner area when the camera is not running. If the camera is running or still starting, a confirmation dialog appears. |
 | **CANCEL** | Closes the confirmation dialog and leaves the scanner open with the camera state unchanged. |
@@ -136,8 +137,8 @@ The camera OCR matching engine displays up to five candidates. A sufficiently hi
 
 | Button | What it does |
 |---|---|
-| **Stock** | Switches to the stock-in workflow. Shows Current Stock, stock list, stock-in history, and the Stock-in Cart. The transaction button becomes **SAVE STOCK-IN**. |
-| **Selling** | Switches to the selling workflow. Shows sale controls and Sale History, changes the cart to Sale Cart, and makes the transaction button **CHECK OUT SALE**. |
+| **Stock** | Switches to the stock-in workflow. Shows Current Stock and the Stock-in Cart. Stock List and Stock-in History are initially hidden and can be opened independently with their respective controls. The transaction button becomes **SAVE STOCK-IN**. |
+| **Selling** | Switches to the selling workflow and changes the cart to Sale Cart. The manual search, scanner, and product details remain visible; Sale History starts hidden and is opened from the button at the bottom of the Sale Cart. The transaction button becomes **CHECK OUT SALE**. |
 
 The application opens in **Selling** mode when there is no unfinished cart. If an unfinished cart exists, its saved purpose (Stock or Selling) is restored instead. The active cart is stored locally; switching modes does not silently clear the cart or change its purpose.
 
@@ -147,11 +148,11 @@ The Current Stock panel is visible in Stock mode.
 
 | Button | What it does |
 |---|---|
-| **View stock list** | Opens or closes the current inventory list. Products are displayed in alphabetical order. Each product row shows DP, PV, and its current quantity. |
-| **− (decrease stock)** | Reduces that product's on-hand stock by one unit. Stock cannot go below zero. |
-| **＋ (increase stock)** | Increases that product's on-hand stock by one unit. |
+| **View stock list** | Opens or closes the current inventory list. Only products with a positive on-hand quantity are displayed, in alphabetical order. Each row shows DP, PV, and current quantity. Stock List rows are informational; they do not provide direct plus/minus quantity editing. |
 | **Stock-in history** | Opens or closes the list of saved stock-in transactions. Select a history summary to expand or collapse its product details. |
-| **CLEAR STOCK** | After confirmation, sets all current stock quantities to zero. It keeps product entries and stock-in/sale history; it does not delete the product catalogue. This action cannot be undone unless a backup is available. |
+| **Share Stock** | Creates a PDF of the current positive-quantity stock list, including product name, quantity, DP, and PV. On supported devices it opens the device share sheet; otherwise it downloads the PDF for sharing. |
+| **Share Stock-In History** | Opens a date-range selector and creates a PDF containing matching stock-in history records. Individual records can also be shared from their history cards. |
+| **Clear Stock** | After a custom in-app confirmation, sets all current stock quantities to zero. It keeps product entries and stock-in/sale history; it does not delete the product catalogue. This action cannot be undone unless a backup is available. |
 | **＋ Add to Cart** (on the product card) | Adds one unit of the selected catalogue product to the Stock-in Cart. |
 | **SAVE STOCK-IN** | Saves all positive quantities in the Stock-in Cart as a stock-in transaction, increases the corresponding inventory quantities, adds a record to Stock-in History, and clears the completed cart. |
 
@@ -169,7 +170,8 @@ Selling mode provides the customer sale workflow.
 | **Select product from available stock** | Dropdown containing products with a positive stock quantity. It is an alternative to scanning a product. |
 | **ADD** | Adds one unit of the selected dropdown product to the Sale Cart. The dropdown is cleared after adding. |
 | **CHECK OUT SALE** | Saves the sale record. For an Actual Sale, it also deducts the paid and free quantities from inventory. For a Record Sale, inventory is unchanged. The completed sale appears in Sale History and the cart is cleared. |
-| **CLEAR SALE CART** | After confirmation, clears the current sale cart and cancels an in-progress sale edit. It does not change stock or delete existing sale history. |
+| **CLEAR SALE CART** | After an in-app confirmation, clears the current sale cart and cancels an in-progress sale edit. It does not change stock or delete existing sale history. |
+| **SHOW SALE HISTORY / HIDE SALE HISTORY** | The button at the bottom of the Sale Cart opens or hides Sale History below the cart. The product search, scanner, and product details remain on the page; opening history does not replace or hide them. |
 
 The customer-name field is optional. If entered, the name is shown in the Sale History summary; otherwise the record is labelled **Sale**.
 
@@ -198,13 +200,16 @@ The cart is saved locally as it is edited, so a page refresh in the same browser
 
 ### 8. History controls
 
-Stock-in History is in Stock mode; Sale History is in Selling mode.
+Stock-in History is in Stock mode; Sale History is in Selling mode. Both history panels are initially hidden until opened from their respective controls. Sale History is opened or hidden using the button at the bottom of the Sale Cart.
 
 | Control | What it does |
 |---|---|
 | **History summary (＋ / −)** | Tap a stock-in or sale summary to expand its product details. Tap it again to collapse those details. Each record expands independently. |
+| **Share this Stock-in PDF / Share this Sale PDF** | Creates a PDF for that individual history record. |
+| **Share Stock-In History / Share Sale History PDF** | Opens a date-range selector. Choose inclusive From and To dates to create a PDF containing all matching records in that range. |
+| **UNPAID SALES** | When unpaid records exist, the filter button can show only unpaid sales; tap it again to show all sales. |
 | **Edit / Return** | Available on eligible recent sale records (within seven days of their original creation). Loads the saved sale into the Sale Cart so it can be corrected and saved again. When editing an Actual Sale, the stock adjustment is recalculated against the original transaction. |
-| **Delete** | Permanently deletes the selected sale record after confirmation. If it was an Actual Sale, its deducted quantities are returned to stock. Deleting a Record Sale does not change stock. |
+| **Delete** | Permanently deletes the selected sale record after an in-app confirmation. If it was an Actual Sale, its deducted quantities are returned to stock. Deleting a Record Sale does not change stock. |
 
 Sale History is ordered newest first by sale date/time. Stock-in History is ordered newest first by stock-in creation time. Products inside an expanded stock-in record are alphabetically ordered.
 
@@ -262,19 +267,24 @@ When **Record** is selected:
 
 ---
 
-## History display and scrolling
+## History display, PDF sharing, and scrolling
 
 To keep the page compact on phones:
 
-- Manual catalogue search shows up to **five matching products** in its visible area; additional matches are available by scrolling inside that results area.
-- The Stock List shows up to **five products** in its visible area; additional products are available by scrolling inside that list.
-- Stock-in History shows up to **five transaction summaries** in its visible area; additional records are available by scrolling inside the list.
-- Sale History shows up to **five transaction summaries** in its visible area; additional records are available by scrolling inside the list.
+- Manual catalogue search shows up to **five matching products** in its visible area.
+- The Stock List shows up to **five products** in its visible area; only positive stock quantities are listed.
+- Stock-in History and Sale History each show up to **five transaction summaries** in their visible areas.
+- Additional items remain accessible by scrolling within each list. When a list reaches its top or bottom, continued scrolling can move the surrounding page rather than trapping the gesture.
 - History summaries start collapsed. Product details appear only when an individual record is expanded.
-- History panels allow scroll chaining: when the list reaches its top or bottom, continued scrolling can move the surrounding page.
 - The Stock List is alphabetical. Both histories are newest first.
+- Individual stock-in and sale records can be shared as PDFs. Each history also supports a date-range PDF export; select From and To dates, and matching records are included.
+- Share actions use the device share sheet when supported; otherwise the PDF is downloaded.
 
 These limits apply to the visible list area, not to the total number of records retained.
+
+## Custom warning and confirmation dialogs
+
+Warnings, notices, and confirmation prompts are displayed in the application's own theme-matched dialog rather than the browser's default alert() or confirm() windows. Confirmation dialogs provide explicit **Cancel** and **Confirm** actions; informational messages provide an **OK** action. The dialog follows the active light or dark theme and is used for actions such as clearing stock, clearing a cart, importing a backup, and confirming scanner or history actions.
 
 ## Local data, backup, and restore
 
@@ -336,4 +346,4 @@ A frontend-only README or HTML change does not require a Cloudflare Worker deplo
 
 ---
 
-*Documentation checked against the current `main` branch `index.html`, regression test file, and merged PRs #12–#15, plus the two later direct `index.html` commits that updated the page title/status text and product-count badge. Keep this guide synchronized with future UI and workflow changes.*
+*Documentation checked against the current `main` branch `index.html` and regression tests after merged PR #24. This guide describes the current Selling-mode visibility and Sale History placement, Stock actions and PDF exports, custom in-app dialogs, and scroll chaining. Keep it synchronized with future UI and workflow changes.*
