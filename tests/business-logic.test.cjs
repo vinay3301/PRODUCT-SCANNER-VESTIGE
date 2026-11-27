@@ -63,7 +63,7 @@ function createHarness() {
     showAppConfirm: () => Promise.resolve(true), console
   };
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
-  // Replace the interactive modal UI with deterministic test responses.
+  // Replace the interactive modal UI with deterministic test responses after script evaluation.
   context.showAppAlert = message => { alerts.push(String(message)); return Promise.resolve(true); };
   context.showAppConfirm = () => Promise.resolve(true);
   vm.runInNewContext(totalsSource, context, { filename: "index.html#cart-totals" });
