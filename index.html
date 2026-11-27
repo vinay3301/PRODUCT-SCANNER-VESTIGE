@@ -2930,7 +2930,8 @@ function pdfEnsureSpace(doc,y,height,title,subtitle,type){
   if(y+height>ph-17){doc.addPage();return pdfStartPage(doc,title,subtitle,type);}
   return y;
 }
-function pdfDrawSummaryCards(doc,cards,y,type){
+function pdfDrawSummaryCards(doc,cards,y,type,title="REPORT",subtitle=""){
+  y=pdfEnsureSpace(doc,y,29,title,subtitle,type);
   const pw=doc.internal.pageSize.getWidth(),gap=3,left=14,totalW=pw-28,w=(totalW-gap*(cards.length-1))/cards.length,h=22;
   const palette=pdfPalette(type),fills=[[232,245,236],[231,242,251],[246,240,255],[255,244,225]];
   cards.forEach((card,i)=>{
@@ -3000,7 +3001,7 @@ async function shareCurrentStockPdf(){
   const totalQty=entries.reduce((sum,[,row])=>sum+Number(row.quantity||0),0);
   const totalDP=entries.reduce((sum,[,row])=>sum+Number(row.product?.DP||0)*Number(row.quantity||0),0);
   const totalPV=entries.reduce((sum,[,row])=>sum+Number(row.product?.pv||0)*Number(row.quantity||0),0);
-  y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:entries.length},{label:"TOTAL QUANTITY",value:totalQty},{label:"STOCK DP VALUE",value:historyPdfMoney(totalDP)},{label:"TOTAL PV",value:Number(totalPV.toFixed(2)).toLocaleString("en-IN")}],y,"stock");
+  y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:entries.length},{label:"TOTAL QUANTITY",value:totalQty},{label:"STOCK DP VALUE",value:historyPdfMoney(totalDP)},{label:"TOTAL PV",value:Number(totalPV.toFixed(2)).toLocaleString("en-IN")}],y,"stock",title,subtitle);
   y=pdfDrawTable(doc,[{label:"#",align:"left"},{label:"PRODUCT NAME"},{label:"QTY",align:"right"},{label:"DP (Rs.)",align:"right"},{label:"PV",align:"right"}],
     entries.map(([key,row],i)=>[i+1,row.product?.name||"Unknown product",Number(row.quantity||0),Number(row.product?.DP||0).toFixed(2),Number(row.product?.pv||0).toLocaleString("en-IN")]),
     y,{type:"stock",title,subtitle,widths:[10,86,23,34,29]});
@@ -3194,7 +3195,7 @@ async function shareHistoryPdf(type,id=null,range=null){
       const rows=items.map(item=>[item.product?.name||"Unknown product",Number(item.quantity||0),Number(item.freeQuantity||0),historyPdfMoney(item.product?.DP),Number(item.product?.pv||0).toLocaleString("en-IN")]);
       y=pdfDrawTable(doc,[{label:"PRODUCT NAME"},{label:"PAID",align:"right"},{label:"FREE",align:"right"},{label:"DP (Rs.)",align:"right"},{label:"PV",align:"right"}],rows,y,{type:pdfType,title,subtitle,widths:[91,19,19,29,24]});
       const pv=items.reduce((sum,item)=>sum+Number(item.product?.pv||0)*Number(item.quantity||0),0);
-      y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:items.length},{label:"TOTAL UNITS",value:items.reduce((sum,item)=>sum+Number(item.quantity||0)+Number(item.freeQuantity||0),0)},{label:"SALE AMOUNT",value:historyPdfMoney(r.total)},{label:"TOTAL PV",value:Number(pv.toFixed(2)).toLocaleString("en-IN")}],y,pdfType);
+      y=pdfDrawSummaryCards(doc,[{label:"PRODUCT TYPES",value:items.length},{label:"TOTAL UNITS",value:items.reduce((sum,item)=>sum+Number(item.quantity||0)+Number(item.freeQuantity||0),0)},{label:"SALE AMOUNT",value:historyPdfMoney(r.total)},{label:"TOTAL PV",value:Number(pv.toFixed(2)).toLocaleString("en-IN")}],y,pdfType,title,subtitle);
       const status=r.paymentStatus==="paid"?"PAID":r.paymentStatus==="unpaid"?"UNPAID":"NOT SPECIFIED";
       y=pdfEnsureSpace(doc,y,12,title,subtitle,pdfType);
       doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...(r.paymentStatus==="paid"?[22,125,65]:r.paymentStatus==="unpaid"?[174,76,48]:[83,96,87]));
