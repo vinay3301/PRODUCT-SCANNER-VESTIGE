@@ -2937,6 +2937,7 @@ async function setBusinessMode(mode){
   $("inventoryPanel").classList.toggle("hidden",currentMode!=="stocking");$("saleControls").classList.toggle("hidden",currentMode!=="selling");
   $("productListSection").classList.remove("hidden");
   $("salesHistorySection").classList.add("hidden");
+  $("saleHistoryToggleBtn").classList.toggle("hidden",currentMode!=="selling");
   $("saleHistoryToggleBtn").textContent="SHOW SALE HISTORY";
   $("stockList").classList.add("hidden");$("stockHistoryList").classList.add("hidden");
   const isSaleCart=cartMode==="selling";
