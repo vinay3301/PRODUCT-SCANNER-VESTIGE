@@ -63,6 +63,14 @@ function createHarness() {
   vm.runInNewContext(businessSource, context, { filename: "index.html#dealer-business-logic" });
   vm.runInNewContext(totalsSource, context, { filename: "index.html#cart-totals" });
   vm.runInNewContext(normalizeSource, context, { filename: "index.html#cart-normalization" });
+  const originalPostSale = context.postSale;
+  context.postSale = () => {
+    originalPostSale();
+    if (!context.deferPaymentChoice) {
+      const listener = fakeDocument.listeners.get("created:click");
+      if (listener) listener({ target: { closest: () => ({ dataset: { paymentChoice: context.testPaymentChoice || "paid" } }) } });
+    }
+  };
   // Keep UI rendering inert in this isolated business-logic harness.
   context.renderCart = () => {};
   context.saveCartToStorage = () => {};
@@ -529,6 +537,7 @@ test("Sale checkout records paid or unpaid status", () => {
   const paid = createHarness();
   seedStock(paid, k1, assure, 5);
   paid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  paid.context.deferPaymentChoice = true;
   paid.context.confirm = () => true;
   paid.context.postSale();
   paid.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "paid" } }) } });
@@ -537,6 +546,7 @@ test("Sale checkout records paid or unpaid status", () => {
   const unpaid = createHarness();
   seedStock(unpaid, k1, assure, 5);
   unpaid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  paid.context.deferPaymentChoice = true;
   unpaid.context.postSale();
   unpaid.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "unpaid" } }) } });
   assert.equal(unpaid.context.businessData.sales[0].paymentStatus, "unpaid");
@@ -544,6 +554,7 @@ test("Sale checkout records paid or unpaid status", () => {
   const unspecified = createHarness();
   seedStock(unspecified, k1, assure, 5);
   unspecified.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  unspecified.context.deferPaymentChoice = true;
   unspecified.context.postSale();
   unspecified.context.document.listeners.get("created:click")({ target: { closest: () => ({ dataset: { paymentChoice: "unknown" } }) } });
   assert.equal(unspecified.context.businessData.sales[0].paymentStatus, "unknown");
