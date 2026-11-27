@@ -796,6 +796,23 @@ test("Sale and Stock-in histories expose individual and date-range PDF sharing",
   assert.match(html, /historyLocalDate\(d\)>=range\.from&&historyLocalDate\(d\)<=range\.to/);
 });
 
+test("All PDF exports use descriptive Vestige filenames and cart-inspired branded layouts", () => {
+  assert.match(html, /function pdfStartPage\(/);
+  assert.match(html, /function pdfDrawSummaryCards\(/);
+  assert.match(html, /function pdfDrawTable\(/);
+  assert.match(html, /function pdfShareOrDownload\(/);
+  assert.match(html, /Vestige_Current_Stock_/);
+  assert.match(html, /Vestige_Sale_Record_/);
+  assert.match(html, /Vestige_Stock_In_Record_/);
+  assert.match(html, /Vestige_Sale_History_/);
+  assert.match(html, /Vestige_Stock_In_History_/);
+  assert.match(html, /_to_/);
+  assert.match(html, /PAYMENT STATUS:/);
+  assert.match(html, /SALE TYPE:/);
+  assert.match(html, /STOCK DP VALUE/);
+  assert.match(html, /doc\\.roundedRect/);
+  assert.match(html, /doc\\.output\\("blob"\\)/);
+});
 test("All warning and confirmation prompts use the app's themed dialog, not browser dialogs", () => {
   assert.doesNotMatch(html, /\b(?:alert|confirm|prompt)\s*\(/);
   assert.match(businessSource, /function showAppDialog\(/);
