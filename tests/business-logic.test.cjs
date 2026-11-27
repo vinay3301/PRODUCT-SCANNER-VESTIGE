@@ -27,7 +27,7 @@ function createHarness() {
     if (!elements.has(id)) {
       elements.set(id, {
         value: "", textContent: "", innerHTML: "", disabled: false, files: [], style: {}, children: [], scrollTop: 0,
-        classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} },
+        classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} }, dataset: {}, onclick: null,
         setAttribute: () => {},
         addEventListener: () => {}, previousElementSibling: { textContent: "" },
         querySelector: () => ({ textContent: "" }), scrollIntoView: () => {}
@@ -500,6 +500,58 @@ test("Failed sale storage write preserves inventory, sales and the cart", () => 
 });
 
 
+
+test("Available stock picker subtracts the current sale cart without mutating inventory", () => {
+  const x = createHarness();
+  seedStock(x, k1, assure, 5);
+  x.context.cart = [{ key: k1, product: assure, quantity: 2, freeQuantity: 0 }];
+  assert.equal(x.context.getAvailableStockForCart(k1), 3);
+  assert.equal(x.context.getStockQuantity(k1), 5);
+  x.context.cart[0].quantity = 5;
+  assert.equal(x.context.getAvailableStockForCart(k1), 0);
+  assert.equal(x.context.getStockQuantity(k1), 5);
+});
+
+test("Sale checkout records paid or unpaid status", () => {
+  const paid = createHarness();
+  seedStock(paid, k1, assure, 5);
+  paid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  paid.context.confirm = () => true;
+  paid.context.postSale();
+  assert.equal(paid.context.businessData.sales[0].paymentStatus, "paid");
+
+  const unpaid = createHarness();
+  seedStock(unpaid, k1, assure, 5);
+  unpaid.context.cart = [{ key: k1, product: assure, quantity: 1, freeQuantity: 0 }];
+  unpaid.context.confirm = () => false;
+  unpaid.context.postSale();
+  assert.equal(unpaid.context.businessData.sales[0].paymentStatus, "unpaid");
+});
+
+test("Legacy sales keep payment status unknown rather than being marked paid or unpaid", () => {
+  const x = createHarness();
+  const migrated = x.context.normalizeBusinessData({
+    schemaVersion: 1, inventory: {}, stockIns: [],
+    sales: [{ id: "legacy-payment", createdAt: "2026-11-01T12:00:00.000Z", total: 10, items: [] }]
+  });
+  assert.equal(migrated.sales[0].paymentStatus, "unknown");
+});
+
+test("Sale UI uses product-style available-stock rows and an unpaid-sales counter", () => {
+  assert.match(html, /id="saleStockPickerToggle"/);
+  assert.match(html, /id="saleStockResults"/);
+  assert.match(html, /class="manual-search-result"[^>]*role="option" data-sale-stock-key/);
+  assert.match(html, /isn't available to add/);
+  assert.match(html, /id="unpaidSalesFilterBtn"/);
+  assert.match(html, /UNPAID SALES:/);
+  assert.match(html, /Payment: /);
+});
+
+test("Stock-in and sale carts are persisted independently", () => {
+  assert.match(html, /modeCarts = \{stocking:\{cart:\[\],cartName:""\},selling:\{cart:\[\],cartName:""\}\}/);
+  assert.match(html, /carts:modeCarts/);
+  assert.match(html, /const draft=modeCarts\[requested\]/);
+});
 
 test("Sale history layout has side-by-side checkout and clear-cart actions", () => {
   assert.match(html, /sale-checkout-actions/);
